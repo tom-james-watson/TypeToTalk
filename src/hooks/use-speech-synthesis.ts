@@ -71,6 +71,17 @@ function getRegionCode(locale: string) {
   return region?.length === 2 ? region.toUpperCase() : null;
 }
 
+function capitalizeLabel(label: string) {
+  if (!label) {
+    return label;
+  }
+
+  return label.replace(
+    /\p{L}[\p{L}\p{M}'-]*/gu,
+    (word) => word.charAt(0).toLocaleUpperCase() + word.slice(1),
+  );
+}
+
 export function getFlagEmoji(locale: string) {
   const region = getRegionCode(locale);
 
@@ -88,8 +99,9 @@ export function getLanguageLabel(
   options?: { includeFlag?: boolean },
 ) {
   const flag = options?.includeFlag ? getFlagEmoji(language.code) : "";
+  const label = capitalizeLabel(language.label);
 
-  return flag ? `${flag} ${language.label}` : language.label;
+  return flag ? `${flag} ${label}` : label;
 }
 
 export function getVoiceOptionId(
