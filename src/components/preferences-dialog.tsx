@@ -1,93 +1,171 @@
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "./ui/dialog";
-import { FieldSelect } from "./ui/field-select";
+import type { Dispatch, ReactElement, SetStateAction } from "react";
 import type { Preferences } from "../hooks/use-speech-synthesis";
 import {
     getReadableLanguageName,
     SPEED_OPTIONS,
 } from "../hooks/use-speech-synthesis";
+import { Button } from "./ui/button";
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "./ui/dialog";
+import {
+    Field,
+    FieldContent,
+    FieldDescription,
+    FieldGroup,
+    FieldLabel,
+} from "./ui/field";
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "./ui/select";
 
 interface PreferencesDialogProps {
     bestVoice?: SpeechSynthesisVoice;
-    children: React.ReactNode;
+    children: ReactElement;
+    onClearHistory: () => void;
     preferences: Preferences;
-    setPreferences: React.Dispatch<React.SetStateAction<Preferences>>;
+    setPreferences: Dispatch<SetStateAction<Preferences>>;
     voices: SpeechSynthesisVoice[];
 }
 
 export function PreferencesDialog({
     bestVoice,
     children,
+    onClearHistory,
     preferences,
     setPreferences,
     voices,
 }: PreferencesDialogProps) {
     return (
         <Dialog>
-            <DialogTrigger asChild>{children}</DialogTrigger>
+            <DialogTrigger render={children} />
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Preferences</DialogTitle>
-                    <DialogDescription>
-                        Choose the voice and playback speed that sound most natural.
-                    </DialogDescription>
                 </DialogHeader>
 
-                <div className="grid gap-4">
-                    <label className="grid gap-2">
-                        <span className="text-sm font-medium">Speed</span>
-                        <FieldSelect
-                            value={preferences.speed}
-                            onChange={(event) =>
+                <FieldGroup>
+                    <Field>
+                        <FieldLabel htmlFor="speed-preference">
+                            Speed
+                        </FieldLabel>
+                        <FieldContent>
+                            <FieldDescription>
+                                Choose the playback rate for spoken phrases.
+                            </FieldDescription>
+                        </FieldContent>
+                        <Select
+                            value={String(preferences.speed)}
+                            onValueChange={(value) =>
                                 setPreferences((current) => ({
                                     ...current,
-                                    speed: Number(event.target.value),
+                                    speed: Number(value),
                                 }))
                             }
                         >
-                            {SPEED_OPTIONS.map((option) => (
-                                <option key={option} value={option}>
-                                    {option}x
-                                </option>
-                            ))}
-                        </FieldSelect>
-                    </label>
+                            <SelectTrigger
+                                className="w-full"
+                                id="speed-preference"
+                            >
+                                <SelectValue placeholder="Select speed" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectGroup>
+                                    {SPEED_OPTIONS.map((option) => (
+                                        <SelectItem
+                                            key={option}
+                                            value={String(option)}
+                                        >
+                                            {option}x
+                                        </SelectItem>
+                                    ))}
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+                    </Field>
 
-                    <label className="grid gap-2">
-                        <span className="text-sm font-medium">Voice</span>
-                        <FieldSelect
+                    <Field>
+                        <FieldLabel htmlFor="voice-preference">
+                            Voice
+                        </FieldLabel>
+                        <FieldContent>
+                            <FieldDescription>
+                                Pick the voice that sounds the most natural for
+                                you.
+                            </FieldDescription>
+                        </FieldContent>
+                        <Select
                             value={preferences.voice}
-                            onChange={(event) =>
+                            onValueChange={(value) =>
                                 setPreferences((current) => ({
                                     ...current,
-                                    voice: event.target.value,
+                                    voice: value ?? current.voice,
                                 }))
                             }
                         >
-                            {bestVoice ? (
-                                <option value={bestVoice.name}>
-                                    {bestVoice.name} (default)
-                                </option>
-                            ) : null}
-                            {voices
-                                .filter((voice) => voice.name !== bestVoice?.name)
-                                .sort((left, right) =>
-                                    left.name.localeCompare(right.name),
-                                )
-                                .map((voice) => (
-                                    <option key={voice.name} value={voice.name}>
-                                        {voice.name} ({getReadableLanguageName(voice.lang)})
-                                    </option>
-                                ))}
-                        </FieldSelect>
-                    </label>
-                </div>
+                            <SelectTrigger
+                                className="w-full"
+                                id="voice-preference"
+                            >
+                                <SelectValue placeholder="Select voice" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectGroup>
+                                    {bestVoice ? (
+                                        <SelectItem value={bestVoice.name}>
+                                            {bestVoice.name} (default)
+                                        </SelectItem>
+                                    ) : null}
+                                    {voices
+                                        .filter(
+                                            (voice) =>
+                                                voice.name !== bestVoice?.name,
+                                        )
+                                        .sort((left, right) =>
+                                            left.name.localeCompare(right.name),
+                                        )
+                                        .map((voice) => (
+                                            <SelectItem
+                                                key={voice.name}
+                                                value={voice.name}
+                                            >
+                                                {voice.name} (
+                                                {getReadableLanguageName(
+                                                    voice.lang,
+                                                )}
+                                                )
+                                            </SelectItem>
+                                        ))}
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                </FieldGroup>
+
+                <DialogFooter>
+                    <DialogClose
+                        render={
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                onClick={onClearHistory}
+                            />
+                        }
+                    >
+                        Clear message history
+                    </DialogClose>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

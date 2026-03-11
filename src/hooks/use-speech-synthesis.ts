@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export interface HistoryItem {
     id: number;
@@ -14,6 +14,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
     speed: 1,
     voice: "",
 };
+
+export const MAX_HISTORY_ITEMS = 50;
 
 export const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 
@@ -64,9 +66,8 @@ export function useSpeechSynthesis() {
     const [currentlyPlaying, setCurrentlyPlaying] = useState<number | null>(
         null,
     );
-    const [historyItems, setHistoryItems] = useState<HistoryItem[]>(() =>
-        readStoredJSON("history", []),
-    );
+    const [queuedIds, setQueuedIds] = useState<number[]>([]);
+    const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
     const [preferences, setPreferences] = useState<Preferences>(() =>
         readStoredJSON("preferences", DEFAULT_PREFERENCES),
     );
@@ -80,6 +81,21 @@ export function useSpeechSynthesis() {
         () => voices.find((voice) => voice.name === preferences.voice),
         [preferences.voice, voices],
     );
+    const queueRef = useRef<HistoryItem[]>([]);
+    const currentUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+    const currentIdRef = useRef<number | null>(null);
+    const selectedVoiceRef = useRef<SpeechSynthesisVoice | undefined>(
+        selectedVoice,
+    );
+    const preferencesRef = useRef(preferences);
+
+    useEffect(() => {
+        selectedVoiceRef.current = selectedVoice;
+    }, [selectedVoice]);
+
+    useEffect(() => {
+        preferencesRef.current = preferences;
+    }, [preferences]);
 
     useEffect(() => {
         if (!speechSupported) {
@@ -118,20 +134,75 @@ export function useSpeechSynthesis() {
     }, [speechSupported]);
 
     useEffect(() => {
-        localStorage.setItem("history", JSON.stringify(historyItems));
-    }, [historyItems]);
-
-    useEffect(() => {
         localStorage.setItem("preferences", JSON.stringify(preferences));
     }, [preferences]);
 
-    const stopPlayback = () => {
+    const playNextInQueue = () => {
+        if (!speechSupported || currentIdRef.current !== null) {
+            return;
+        }
+
+        const nextItem = queueRef.current.shift();
+
+        setQueuedIds(queueRef.current.map((item) => item.id));
+
+        if (!nextItem) {
+            return;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(nextItem.text);
+        utterance.rate = preferencesRef.current.speed;
+
+        if (selectedVoiceRef.current) {
+            utterance.voice = selectedVoiceRef.current;
+        }
+
+        currentUtteranceRef.current = utterance;
+        currentIdRef.current = nextItem.id;
+        setCurrentlyPlaying(nextItem.id);
+
+        utterance.onend = () => {
+            if (currentIdRef.current !== nextItem.id) {
+                return;
+            }
+
+            currentUtteranceRef.current = null;
+            currentIdRef.current = null;
+            setCurrentlyPlaying(null);
+            playNextInQueue();
+        };
+
+        utterance.onerror = () => {
+            if (currentIdRef.current !== nextItem.id) {
+                return;
+            }
+
+            currentUtteranceRef.current = null;
+            currentIdRef.current = null;
+            setCurrentlyPlaying(null);
+            playNextInQueue();
+        };
+
+        window.speechSynthesis.speak(utterance);
+    };
+
+    const stopPlayback = (options?: { clearQueue?: boolean }) => {
         if (!speechSupported) {
             return;
         }
 
+        currentUtteranceRef.current = null;
+        currentIdRef.current = null;
         window.speechSynthesis.cancel();
         setCurrentlyPlaying(null);
+
+        if (options?.clearQueue) {
+            queueRef.current = [];
+            setQueuedIds([]);
+            return;
+        }
+
+        playNextInQueue();
     };
 
     const speak = (text: string, id: number) => {
@@ -139,29 +210,24 @@ export function useSpeechSynthesis() {
             return;
         }
 
-        if (currentlyPlaying === id) {
+        if (currentIdRef.current === id) {
             stopPlayback();
             return;
         }
 
-        window.speechSynthesis.cancel();
-
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = preferences.speed;
-
-        if (selectedVoice) {
-            utterance.voice = selectedVoice;
+        if (queueRef.current.some((item) => item.id === id)) {
+            queueRef.current = queueRef.current.filter((item) => item.id !== id);
+            setQueuedIds(queueRef.current.map((item) => item.id));
+            return;
         }
 
-        utterance.onend = () => setCurrentlyPlaying(null);
-        utterance.onerror = () => setCurrentlyPlaying(null);
-
-        setCurrentlyPlaying(id);
-        window.speechSynthesis.speak(utterance);
+        queueRef.current = [...queueRef.current, { id, text }];
+        setQueuedIds(queueRef.current.map((item) => item.id));
+        playNextInQueue();
     };
 
     const submitInput = () => {
-        const text = input.trim();
+        const text = input.replace(/\s+/g, " ").trim();
 
         if (!text) {
             return;
@@ -172,13 +238,13 @@ export function useSpeechSynthesis() {
             text,
         };
 
-        setHistoryItems((current) => [newItem, ...current]);
+        setHistoryItems((current) => [...current, newItem].slice(-MAX_HISTORY_ITEMS));
         setInput("");
         speak(newItem.text, newItem.id);
     };
 
     const clearHistory = () => {
-        stopPlayback();
+        stopPlayback({ clearQueue: true });
         setHistoryItems([]);
     };
 
@@ -189,6 +255,7 @@ export function useSpeechSynthesis() {
         historyItems,
         input,
         preferences,
+        queuedIds,
         selectedVoice,
         setInput,
         setPreferences,

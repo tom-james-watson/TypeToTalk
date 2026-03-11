@@ -1,40 +1,55 @@
-import type { HistoryItem as HistoryItemModel } from "../hooks/use-speech-synthesis";
+import {
+    MAX_HISTORY_ITEMS,
+    type HistoryItem as HistoryItemModel,
+} from "../hooks/use-speech-synthesis";
 import { HistoryItem } from "./history-item";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "./ui/empty";
 
 interface HistoryListProps {
     currentId: number | null;
     items: HistoryItemModel[];
-    reverseOnDesktop?: boolean;
+    queuedIds: number[];
     onTogglePlayback: (item: HistoryItemModel) => void;
 }
 
 export function HistoryList({
     currentId,
     items,
-    reverseOnDesktop = false,
+    queuedIds,
     onTogglePlayback,
 }: HistoryListProps) {
+    const isTruncated = items.length >= MAX_HISTORY_ITEMS;
+
     if (items.length === 0) {
         return (
-            <div className="py-4 text-center text-sm text-[hsl(var(--muted-foreground))]">
-                Nothing yet. Type something and press Enter.
-            </div>
+            <Empty className="border-0 py-8">
+                <EmptyHeader>
+                    <EmptyTitle>Nothing yet</EmptyTitle>
+                    <EmptyDescription>
+                        Type something and press Enter.
+                    </EmptyDescription>
+                </EmptyHeader>
+            </Empty>
         );
     }
 
     return (
-        <div
-            className={`flex flex-col gap-2 pb-4 ${
-                reverseOnDesktop ? "md:flex-col-reverse" : ""
-            }`}
-        >
+        <div className="mx-auto flex w-full flex-col">
+            {isTruncated ? (
+                <p className="mb-3 self-center rounded-full bg-muted px-3 py-1 text-center text-xs text-muted-foreground">
+                    Showing the latest {MAX_HISTORY_ITEMS} phrases. Older
+                    history is removed automatically.
+                </p>
+            ) : null}
             {items.map((item) => (
-                <HistoryItem
-                    key={item.id}
-                    text={item.text}
-                    isPlaying={currentId === item.id}
-                    onToggle={() => onTogglePlayback(item)}
-                />
+                <div key={item.id}>
+                    <HistoryItem
+                        text={item.text}
+                        isPlaying={currentId === item.id}
+                        isQueued={queuedIds.includes(item.id)}
+                        onToggle={() => onTogglePlayback(item)}
+                    />
+                </div>
             ))}
         </div>
     );
