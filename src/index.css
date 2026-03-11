@@ -195,7 +195,9 @@
 .conversation-layout {
     --conversation-gap: 1.5rem;
     padding-top: var(--conversation-gap);
-    padding-bottom: calc(var(--composer-footprint, 0px) + var(--conversation-gap));
+    padding-bottom: calc(
+        var(--composer-footprint, 0px) + var(--conversation-gap) + var(--keyboard-inset, 0px)
+    );
 }
 
 @media (min-width: 640px) {

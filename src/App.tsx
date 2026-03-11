@@ -32,6 +32,10 @@ function App() {
             ? historyItems[historyItems.length - 1].id
             : null;
     const [composerFootprint, setComposerFootprint] = useState(0);
+    const [keyboardInset, setKeyboardInset] = useState(0);
+    const [viewportHeight, setViewportHeight] = useState(() =>
+        typeof window === "undefined" ? 0 : window.innerHeight,
+    );
 
     useLayoutEffect(() => {
         const dock = composerDockRef.current;
@@ -56,6 +60,52 @@ function App() {
 
         return () => {
             observer.disconnect();
+        };
+    }, []);
+
+    useEffect(() => {
+        const updateViewportMetrics = () => {
+            const visualViewport = window.visualViewport;
+
+            if (!visualViewport) {
+                setKeyboardInset(0);
+                setViewportHeight(window.innerHeight);
+                return;
+            }
+
+            const nextKeyboardInset = Math.max(
+                0,
+                Math.round(
+                    window.innerHeight -
+                        visualViewport.height -
+                        visualViewport.offsetTop,
+                ),
+            );
+
+            setKeyboardInset(nextKeyboardInset);
+            setViewportHeight(Math.round(visualViewport.height));
+        };
+
+        updateViewportMetrics();
+
+        const visualViewport = window.visualViewport;
+
+        if (!visualViewport) {
+            window.addEventListener("resize", updateViewportMetrics);
+
+            return () => {
+                window.removeEventListener("resize", updateViewportMetrics);
+            };
+        }
+
+        visualViewport.addEventListener("resize", updateViewportMetrics);
+        visualViewport.addEventListener("scroll", updateViewportMetrics);
+        window.addEventListener("resize", updateViewportMetrics);
+
+        return () => {
+            visualViewport.removeEventListener("resize", updateViewportMetrics);
+            visualViewport.removeEventListener("scroll", updateViewportMetrics);
+            window.removeEventListener("resize", updateViewportMetrics);
         };
     }, []);
 
@@ -156,6 +206,8 @@ function App() {
             style={
                 {
                     "--composer-footprint": `${composerFootprint}px`,
+                    "--keyboard-inset": `${keyboardInset}px`,
+                    "--app-height": `${viewportHeight}px`,
                 } as CSSProperties
             }
         >
@@ -165,6 +217,9 @@ function App() {
                     hasHistory ? "conversation-layout" : "h-dvh",
                     !hasHistory && "h-dvh",
                 )}
+                style={{
+                    minHeight: "var(--app-height)",
+                }}
             >
                 <section
                     className={cn(
@@ -177,7 +232,7 @@ function App() {
                         !hasHistory
                             ? {
                                   minHeight:
-                                      "calc(100dvh - var(--composer-footprint, 0px))",
+                                      "calc(var(--app-height) - var(--composer-footprint, 0px) - var(--keyboard-inset, 0px))",
                               }
                             : undefined
                     }
@@ -218,12 +273,17 @@ function App() {
             {hasHistory ? (
                 <div className="pointer-events-none fixed inset-x-0 top-0 z-30">
                     <div className="mx-auto w-full max-w-xl px-4 sm:px-6">
-                        <div className="h-20 bg-linear-to-b from-background from-0% to-transparent" />
+                        <div className="h-14 bg-linear-to-b from-background from-0% to-transparent" />
                     </div>
                 </div>
             ) : null}
 
-            <div className="composer-dock fixed inset-x-0 bottom-0 z-40">
+            <div
+                className="composer-dock fixed inset-x-0 z-40"
+                style={{
+                    bottom: "var(--keyboard-inset)",
+                }}
+            >
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-34 bg-linear-to-t from-background from-35% via-background via-57% to-transparent composer-dock__gradient" />
                 <div
                     ref={composerDockRef}
