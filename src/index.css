@@ -118,12 +118,13 @@
     }
 
     html {
+        height: 100%;
         font-family: var(--font-sans);
     }
 
     body {
         min-width: 320px;
-        min-height: 100vh;
+        min-height: 100dvh;
         margin: 0;
         background: var(--background);
         color: var(--foreground);
@@ -131,10 +132,11 @@
         text-rendering: optimizeLegibility;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+        overflow: hidden;
     }
 
     #root {
-        min-height: 100vh;
+        height: 100dvh;
     }
 
     button,
@@ -195,9 +197,11 @@
 .conversation-layout {
     --conversation-gap: 1.5rem;
     padding-top: var(--conversation-gap);
-    padding-bottom: calc(
-        var(--composer-footprint, 0px) + var(--conversation-gap) + var(--keyboard-inset, 0px)
-    );
+    padding-bottom: var(--conversation-gap);
+}
+
+.empty-layout {
+    padding-bottom: 0;
 }
 
 @media (min-width: 640px) {

@@ -1,9 +1,6 @@
 import {
     useEffect,
-    useLayoutEffect,
     useRef,
-    useState,
-    type CSSProperties,
 } from "react";
 import { ComposerBar } from "./components/composer-bar";
 import { HistoryList } from "./components/history-list";
@@ -12,6 +9,7 @@ import { cn } from "./lib/utils";
 
 function App() {
     const composerDockRef = useRef<HTMLDivElement>(null);
+    const mainRef = useRef<HTMLElement>(null);
     const {
         bestVoice,
         clearHistory,
@@ -31,83 +29,6 @@ function App() {
         historyItems.length > 0
             ? historyItems[historyItems.length - 1].id
             : null;
-    const [composerFootprint, setComposerFootprint] = useState(0);
-    const [keyboardInset, setKeyboardInset] = useState(0);
-    const [viewportHeight, setViewportHeight] = useState(() =>
-        typeof window === "undefined" ? 0 : window.innerHeight,
-    );
-
-    useLayoutEffect(() => {
-        const dock = composerDockRef.current;
-
-        if (!dock) {
-            return;
-        }
-
-        const updateComposerFootprint = () => {
-            setComposerFootprint(
-                Math.ceil(dock.getBoundingClientRect().height),
-            );
-        };
-
-        updateComposerFootprint();
-
-        const observer = new ResizeObserver(() => {
-            updateComposerFootprint();
-        });
-
-        observer.observe(dock);
-
-        return () => {
-            observer.disconnect();
-        };
-    }, []);
-
-    useEffect(() => {
-        const updateViewportMetrics = () => {
-            const visualViewport = window.visualViewport;
-
-            if (!visualViewport) {
-                setKeyboardInset(0);
-                setViewportHeight(window.innerHeight);
-                return;
-            }
-
-            const nextKeyboardInset = Math.max(
-                0,
-                Math.round(
-                    window.innerHeight -
-                        visualViewport.height -
-                        visualViewport.offsetTop,
-                ),
-            );
-
-            setKeyboardInset(nextKeyboardInset);
-            setViewportHeight(Math.round(visualViewport.height));
-        };
-
-        updateViewportMetrics();
-
-        const visualViewport = window.visualViewport;
-
-        if (!visualViewport) {
-            window.addEventListener("resize", updateViewportMetrics);
-
-            return () => {
-                window.removeEventListener("resize", updateViewportMetrics);
-            };
-        }
-
-        visualViewport.addEventListener("resize", updateViewportMetrics);
-        visualViewport.addEventListener("scroll", updateViewportMetrics);
-        window.addEventListener("resize", updateViewportMetrics);
-
-        return () => {
-            visualViewport.removeEventListener("resize", updateViewportMetrics);
-            visualViewport.removeEventListener("scroll", updateViewportMetrics);
-            window.removeEventListener("resize", updateViewportMetrics);
-        };
-    }, []);
 
     useEffect(() => {
         if (!hasHistory) {
@@ -119,11 +40,8 @@ function App() {
 
         frameA = window.requestAnimationFrame(() => {
             frameB = window.requestAnimationFrame(() => {
-                const scrollingElement =
-                    document.scrollingElement ?? document.documentElement;
-
-                window.scrollTo({
-                    top: scrollingElement.scrollHeight,
+                mainRef.current?.scrollTo({
+                    top: mainRef.current.scrollHeight,
                     behavior: "auto",
                 });
             });
@@ -133,7 +51,7 @@ function App() {
             window.cancelAnimationFrame(frameA);
             window.cancelAnimationFrame(frameB);
         };
-    }, [composerFootprint, hasHistory, latestHistoryId]);
+    }, [hasHistory, latestHistoryId]);
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -199,43 +117,22 @@ function App() {
 
     return (
         <div
-            className={cn(
-                "bg-background text-foreground",
-                hasHistory ? "min-h-screen" : "h-dvh overflow-hidden",
-            )}
-            style={
-                {
-                    "--composer-footprint": `${composerFootprint}px`,
-                    "--keyboard-inset": `${keyboardInset}px`,
-                    "--app-height": `${viewportHeight}px`,
-                } as CSSProperties
-            }
+            className="flex h-dvh flex-col overflow-hidden bg-background text-foreground"
         >
             <main
+                ref={mainRef}
                 className={cn(
-                    "mx-auto w-full max-w-xl px-4 sm:px-6",
-                    hasHistory ? "conversation-layout" : "h-dvh",
-                    !hasHistory && "h-dvh",
+                    "mx-auto min-h-0 w-full max-w-xl flex-1 overflow-y-auto px-4 sm:px-6",
+                    hasHistory ? "conversation-layout" : "empty-layout",
                 )}
-                style={{
-                    minHeight: "var(--app-height)",
-                }}
             >
                 <section
                     className={cn(
                         "empty-state-shell",
-                        !hasHistory && "flex items-center justify-center",
+                        !hasHistory && "flex min-h-full items-center justify-center",
                         hasHistory ? "is-hidden" : "is-visible",
                     )}
                     aria-hidden={hasHistory}
-                    style={
-                        !hasHistory
-                            ? {
-                                  minHeight:
-                                      "calc(var(--app-height) - var(--composer-footprint, 0px) - var(--keyboard-inset, 0px))",
-                              }
-                            : undefined
-                    }
                 >
                     <div className="mx-auto flex max-w-xl flex-col items-center justify-center gap-4 px-4 text-center">
                         <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
@@ -271,19 +168,14 @@ function App() {
             </main>
 
             {hasHistory ? (
-                <div className="pointer-events-none fixed inset-x-0 top-0 z-30">
+                <div className="pointer-events-none sticky top-0 z-30 -mb-14">
                     <div className="mx-auto w-full max-w-xl px-4 sm:px-6">
                         <div className="h-14 bg-linear-to-b from-background from-0% to-transparent" />
                     </div>
                 </div>
             ) : null}
 
-            <div
-                className="composer-dock fixed inset-x-0 z-40"
-                style={{
-                    bottom: "var(--keyboard-inset)",
-                }}
-            >
+            <div className="composer-dock relative z-40 shrink-0">
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-34 bg-linear-to-t from-background from-35% via-background via-57% to-transparent composer-dock__gradient" />
                 <div
                     ref={composerDockRef}
