@@ -16,6 +16,7 @@ interface ComposerBarProps {
   bestVoice?: VoiceOption;
   input: string;
   languageOptions: LanguageOption[];
+  onArrowHistoryNavigate: (direction: "up" | "down") => boolean;
   onInputChange: (value: string) => void;
   onSubmit: () => void;
   preferences: Preferences;
@@ -28,6 +29,7 @@ export function ComposerBar({
   className,
   input,
   languageOptions,
+  onArrowHistoryNavigate,
   onInputChange,
   onSubmit,
   preferences,
@@ -56,6 +58,16 @@ export function ComposerBar({
               value={input}
               onChange={(event) => onInputChange(event.target.value)}
               onKeyDown={(event) => {
+                if (
+                  (event.key === "ArrowUp" || event.key === "ArrowDown") &&
+                  onArrowHistoryNavigate(
+                    event.key === "ArrowUp" ? "up" : "down",
+                  )
+                ) {
+                  event.preventDefault();
+                  return;
+                }
+
                 if (event.key === "Enter") {
                   event.preventDefault();
                   onSubmit();

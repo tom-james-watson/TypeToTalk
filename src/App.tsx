@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { ComposerBar } from "./components/composer-bar";
 import { HistoryList } from "./components/history-list";
+import { useComposerHistoryNavigation } from "./hooks/use-composer-history-navigation";
 import { useSpeechSynthesis } from "./hooks/use-speech-synthesis";
 import { cn } from "./lib/utils";
 
@@ -24,6 +25,13 @@ function App() {
   const hasHistory = historyItems.length > 0;
   const latestHistoryId =
     historyItems.length > 0 ? historyItems[historyItems.length - 1].id : null;
+  const { handleArrowHistoryNavigate, handleInputChange, handleSubmit } =
+    useComposerHistoryNavigation({
+      historyItems,
+      input,
+      setInput,
+      submitInput,
+    });
 
   useEffect(() => {
     if (!hasHistory) {
@@ -96,8 +104,9 @@ function App() {
   const composer = () => (
     <ComposerBar
       input={input}
-      onInputChange={setInput}
-      onSubmit={submitInput}
+      onArrowHistoryNavigate={handleArrowHistoryNavigate}
+      onInputChange={handleInputChange}
+      onSubmit={handleSubmit}
       bestVoice={bestVoice}
       preferences={preferences}
       setPreferences={setPreferences}
