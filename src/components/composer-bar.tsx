@@ -1,9 +1,9 @@
 import { ArrowUp, Settings2 } from "lucide-react";
 import { useId, type Dispatch, type SetStateAction } from "react";
 import type {
-    LanguageOption,
-    Preferences,
-    VoiceOption,
+  LanguageOption,
+  Preferences,
+  VoiceOption,
 } from "../hooks/use-speech-synthesis";
 import { cn } from "../lib/utils";
 import { PreferencesDialog } from "./preferences-dialog";
@@ -14,25 +14,25 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "./ui/input-group";
 interface ComposerBarProps {
   className?: string;
   bestVoice?: VoiceOption;
-    input: string;
-    languageOptions: LanguageOption[];
-    onInputChange: (value: string) => void;
-    onSubmit: () => void;
-    preferences: Preferences;
-    setPreferences: Dispatch<SetStateAction<Preferences>>;
-    voices: VoiceOption[];
+  input: string;
+  languageOptions: LanguageOption[];
+  onInputChange: (value: string) => void;
+  onSubmit: () => void;
+  preferences: Preferences;
+  setPreferences: Dispatch<SetStateAction<Preferences>>;
+  voices: VoiceOption[];
 }
 
 export function ComposerBar({
   bestVoice,
   className,
-    input,
-    languageOptions,
-    onInputChange,
-    onSubmit,
-    preferences,
-    setPreferences,
-    voices,
+  input,
+  languageOptions,
+  onInputChange,
+  onSubmit,
+  preferences,
+  setPreferences,
+  voices,
 }: ComposerBarProps) {
   const inputId = useId();
 

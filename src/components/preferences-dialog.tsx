@@ -73,8 +73,9 @@ export function PreferencesDialog({
   }, [isOpen]);
 
   const selectedLanguage =
-    languageOptions.find((language) => language.code === preferences.language) ??
-    languageOptions[0];
+    languageOptions.find(
+      (language) => language.code === preferences.language,
+    ) ?? languageOptions[0];
   const visibleBestVoice =
     voices.find((voice) => voice.isDefault) ?? voices[0] ?? bestVoice;
   const selectedVoice =

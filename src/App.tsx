@@ -10,17 +10,17 @@ function App() {
   const {
     bestVoice,
     currentlyPlaying,
-        historyItems,
-        input,
-        languageOptions,
-        preferences,
-        queuedIds,
-        setInput,
-        setPreferences,
-        speak,
-        submitInput,
-        voices,
-    } = useSpeechSynthesis();
+    historyItems,
+    input,
+    languageOptions,
+    preferences,
+    queuedIds,
+    setInput,
+    setPreferences,
+    speak,
+    submitInput,
+    voices,
+  } = useSpeechSynthesis();
   const hasHistory = historyItems.length > 0;
   const latestHistoryId =
     historyItems.length > 0 ? historyItems[historyItems.length - 1].id : null;
@@ -98,12 +98,12 @@ function App() {
       input={input}
       onInputChange={setInput}
       onSubmit={submitInput}
-            bestVoice={bestVoice}
-            preferences={preferences}
-            setPreferences={setPreferences}
-            languageOptions={languageOptions}
-            voices={voices}
-        />
+      bestVoice={bestVoice}
+      preferences={preferences}
+      setPreferences={setPreferences}
+      languageOptions={languageOptions}
+      voices={voices}
+    />
   );
 
   return (
