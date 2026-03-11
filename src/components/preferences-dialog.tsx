@@ -1,7 +1,12 @@
 import type { Dispatch, ReactElement, SetStateAction } from "react";
-import type { Preferences } from "../hooks/use-speech-synthesis";
+import type {
+    LanguageOption,
+    Preferences,
+    VoiceOption,
+} from "../hooks/use-speech-synthesis";
 import {
-    getReadableLanguageName,
+    getLanguageLabel,
+    getVoiceLabel,
     SPEED_OPTIONS,
 } from "../hooks/use-speech-synthesis";
 import { Button } from "./ui/button";
@@ -31,22 +36,37 @@ import {
 } from "./ui/select";
 
 interface PreferencesDialogProps {
-    bestVoice?: SpeechSynthesisVoice;
+    bestVoice?: VoiceOption;
     children: ReactElement;
+    languageOptions: LanguageOption[];
     onClearHistory: () => void;
     preferences: Preferences;
     setPreferences: Dispatch<SetStateAction<Preferences>>;
-    voices: SpeechSynthesisVoice[];
+    voices: VoiceOption[];
 }
 
 export function PreferencesDialog({
     bestVoice,
     children,
+    languageOptions,
     onClearHistory,
     preferences,
     setPreferences,
     voices,
 }: PreferencesDialogProps) {
+    const selectedLanguage =
+        languageOptions.find(
+            (language) => language.code === preferences.language,
+        ) ?? languageOptions[0];
+    const selectedVoice =
+        voices.find((voice) => voice.id === preferences.voice) ?? bestVoice;
+    const selectedVoiceLabel = selectedVoice
+        ? getVoiceLabel(selectedVoice, { includeFlag: true })
+        : undefined;
+    const selectedLanguageLabel = selectedLanguage
+        ? getLanguageLabel(selectedLanguage, { includeFlag: true })
+        : undefined;
+
     return (
         <Dialog>
             <DialogTrigger render={children} />
@@ -96,6 +116,50 @@ export function PreferencesDialog({
                     </Field>
 
                     <Field>
+                        <FieldLabel htmlFor="language-preference">
+                            Language
+                        </FieldLabel>
+                        <FieldContent>
+                            <FieldDescription>
+                                Select the language you want to write in.
+                            </FieldDescription>
+                        </FieldContent>
+                        <Select
+                            value={preferences.language}
+                            onValueChange={(value) =>
+                                setPreferences((current) => ({
+                                    ...current,
+                                    language: value ?? current.language,
+                                    voice: "",
+                                }))
+                            }
+                        >
+                            <SelectTrigger
+                                className="w-full"
+                                id="language-preference"
+                            >
+                                <SelectValue placeholder="Select language">
+                                    {selectedLanguageLabel}
+                                </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectGroup>
+                                    {languageOptions.map((language) => (
+                                        <SelectItem
+                                            key={language.code}
+                                            value={language.code}
+                                        >
+                                            {getLanguageLabel(language, {
+                                                includeFlag: true,
+                                            })}
+                                        </SelectItem>
+                                    ))}
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+                    </Field>
+
+                    <Field>
                         <FieldLabel htmlFor="voice-preference">
                             Voice
                         </FieldLabel>
@@ -118,33 +182,32 @@ export function PreferencesDialog({
                                 className="w-full"
                                 id="voice-preference"
                             >
-                                <SelectValue placeholder="Select voice" />
+                                <SelectValue placeholder="Select voice">
+                                    {selectedVoiceLabel}
+                                </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectGroup>
                                     {bestVoice ? (
-                                        <SelectItem value={bestVoice.name}>
-                                            {bestVoice.name} (default)
+                                        <SelectItem value={bestVoice.id}>
+                                            {getVoiceLabel(bestVoice, {
+                                                includeFlag: true,
+                                            })}
                                         </SelectItem>
                                     ) : null}
                                     {voices
                                         .filter(
                                             (voice) =>
-                                                voice.name !== bestVoice?.name,
-                                        )
-                                        .sort((left, right) =>
-                                            left.name.localeCompare(right.name),
+                                                voice.id !== bestVoice?.id,
                                         )
                                         .map((voice) => (
                                             <SelectItem
-                                                key={voice.name}
-                                                value={voice.name}
+                                                key={voice.id}
+                                                value={voice.id}
                                             >
-                                                {voice.name} (
-                                                {getReadableLanguageName(
-                                                    voice.lang,
-                                                )}
-                                                )
+                                                {getVoiceLabel(voice, {
+                                                    includeFlag: true,
+                                                })}
                                             </SelectItem>
                                         ))}
                                 </SelectGroup>

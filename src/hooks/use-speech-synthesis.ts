@@ -1,3 +1,4 @@
+import { WebSpeechVoiceManager } from "@readium/speech";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export interface HistoryItem {
@@ -6,11 +7,27 @@ export interface HistoryItem {
 }
 
 export interface Preferences {
+    language: string;
     speed: number;
     voice: string;
 }
 
+export interface LanguageOption {
+    code: string;
+    count: number;
+    label: string;
+}
+
+export interface VoiceOption {
+    id: string;
+    isDefault: boolean;
+    label: string;
+    language: string;
+    nativeVoice: SpeechSynthesisVoice;
+}
+
 export const DEFAULT_PREFERENCES: Preferences = {
+    language: "",
     speed: 1,
     voice: "",
 };
@@ -28,25 +45,24 @@ function readStoredJSON<T>(key: string, fallback: T): T {
     }
 }
 
-function findBestVoice(availableVoices: SpeechSynthesisVoice[]) {
-    const language = navigator.language.toLowerCase();
+function normalizeLocale(locale: string) {
+    return locale.toLowerCase();
+}
 
-    return (
-        availableVoices.find(
-            (voice) =>
-                voice.name.includes("Google") &&
-                voice.lang.toLowerCase() === language,
-        ) ??
-        availableVoices.find(
-            (voice) =>
-                voice.name.includes("Microsoft") &&
-                voice.lang.toLowerCase() === language,
-        ) ??
-        availableVoices.find((voice) =>
-            voice.lang.toLowerCase().startsWith(language.split("-")[0]),
-        ) ??
-        availableVoices[0]
-    );
+function getBaseLanguage(locale: string) {
+    return normalizeLocale(locale).split("-")[0];
+}
+
+function getPreferredLanguages() {
+    if (typeof navigator === "undefined") {
+        return ["en"];
+    }
+
+    const languages = navigator.languages?.length
+        ? navigator.languages
+        : [navigator.language];
+
+    return languages.map(normalizeLocale);
 }
 
 export function getReadableLanguageName(langCode: string) {
@@ -61,6 +77,49 @@ export function getReadableLanguageName(langCode: string) {
     }
 }
 
+function getRegionCode(locale: string) {
+    const [, region] = locale.split("-");
+
+    return region?.length === 2 ? region.toUpperCase() : null;
+}
+
+export function getFlagEmoji(locale: string) {
+    const region = getRegionCode(locale);
+
+    if (!region) {
+        return "";
+    }
+
+    return String.fromCodePoint(
+        ...[...region].map((char) => 127397 + char.charCodeAt(0)),
+    );
+}
+
+export function getLanguageLabel(
+    language: Pick<LanguageOption, "code" | "label">,
+    options?: { includeFlag?: boolean },
+) {
+    const flag = options?.includeFlag ? getFlagEmoji(language.code) : "";
+
+    return flag ? `${flag} ${language.label}` : language.label;
+}
+
+export function getVoiceOptionId(
+    voice: Pick<SpeechSynthesisVoice, "name" | "voiceURI" | "lang">,
+    language?: string,
+) {
+    return voice.voiceURI || `${voice.name}::${language ?? voice.lang}`;
+}
+
+export function getVoiceLabel(
+    voice: Pick<VoiceOption, "label" | "language">,
+    options?: { includeFlag?: boolean },
+) {
+    const flag = options?.includeFlag ? getFlagEmoji(voice.language) : "";
+
+    return flag ? `${flag} ${voice.label}` : voice.label;
+}
+
 export function useSpeechSynthesis() {
     const [input, setInput] = useState("");
     const [currentlyPlaying, setCurrentlyPlaying] = useState<number | null>(
@@ -71,26 +130,33 @@ export function useSpeechSynthesis() {
     const [preferences, setPreferences] = useState<Preferences>(() =>
         readStoredJSON("preferences", DEFAULT_PREFERENCES),
     );
-    const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-    const [bestVoice, setBestVoice] = useState<SpeechSynthesisVoice>();
+    const [languageOptions, setLanguageOptions] = useState<LanguageOption[]>([]);
+    const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
+    const [bestVoice, setBestVoice] = useState<VoiceOption>();
+    const [voiceManager, setVoiceManager] = useState<WebSpeechVoiceManager | null>(
+        null,
+    );
 
     const speechSupported =
         typeof window !== "undefined" && "speechSynthesis" in window;
 
     const selectedVoice = useMemo(
-        () => voices.find((voice) => voice.name === preferences.voice),
-        [preferences.voice, voices],
+        () =>
+            voiceOptions.find(
+                (voice) => getVoiceOptionId(voice.nativeVoice, voice.language) === preferences.voice,
+            ),
+        [preferences.voice, voiceOptions],
     );
     const queueRef = useRef<HistoryItem[]>([]);
     const currentUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
     const currentIdRef = useRef<number | null>(null);
     const selectedVoiceRef = useRef<SpeechSynthesisVoice | undefined>(
-        selectedVoice,
+        selectedVoice?.nativeVoice,
     );
     const preferencesRef = useRef(preferences);
 
     useEffect(() => {
-        selectedVoiceRef.current = selectedVoice;
+        selectedVoiceRef.current = selectedVoice?.nativeVoice;
     }, [selectedVoice]);
 
     useEffect(() => {
@@ -102,36 +168,147 @@ export function useSpeechSynthesis() {
             return;
         }
 
-        const loadVoices = () => {
-            const availableVoices = window.speechSynthesis.getVoices();
-            setVoices(availableVoices);
+        let cancelled = false;
 
-            if (availableVoices.length === 0) {
-                return;
+        const initializeVoiceManager = async () => {
+            const manager = await WebSpeechVoiceManager.initialize();
+
+            if (!cancelled) {
+                setVoiceManager(manager);
             }
-
-            const suggestedVoice = findBestVoice(availableVoices);
-            setBestVoice(suggestedVoice);
-
-            setPreferences((current) => {
-                if (current.voice || !suggestedVoice) {
-                    return current;
-                }
-
-                return { ...current, voice: suggestedVoice.name };
-            });
         };
 
-        loadVoices();
-        window.speechSynthesis.onvoiceschanged = loadVoices;
+        void initializeVoiceManager();
 
         return () => {
-            if (window.speechSynthesis.onvoiceschanged === loadVoices) {
-                window.speechSynthesis.onvoiceschanged = null;
-            }
+            cancelled = true;
             window.speechSynthesis.cancel();
         };
     }, [speechSupported]);
+
+    useEffect(() => {
+        if (!voiceManager) {
+            return;
+        }
+
+        let cancelled = false;
+
+        const syncVoiceOptions = async () => {
+            const filters = {
+                excludeNovelty: true,
+                excludeVeryLowQuality: true,
+                removeDuplicates: true,
+            } as const;
+            const browserLanguages = voiceManager.getLanguages(
+                navigator.language,
+                filters,
+            );
+            const availableLanguages = browserLanguages.filter(
+                (language) => language.count > 0,
+            );
+
+            if (cancelled) {
+                return;
+            }
+
+            setLanguageOptions(availableLanguages);
+
+            const preferredLanguages = getPreferredLanguages();
+            const currentLanguage =
+                preferences.language ||
+                availableLanguages.find((language) =>
+                    preferredLanguages.some((preferredLanguage) => {
+                        const baseLanguage = getBaseLanguage(preferredLanguage);
+
+                        return (
+                            language.code.toLowerCase() === preferredLanguage ||
+                            language.code.toLowerCase() === baseLanguage
+                        );
+                    }),
+                )?.code ||
+                availableLanguages[0]?.code ||
+                "";
+
+            const filteredVoices = voiceManager.getVoices({
+                ...filters,
+                languages: currentLanguage || preferredLanguages,
+            });
+            const sortedVoices =
+                await voiceManager.sortVoicesByQuality(filteredVoices);
+            const mappedVoices: VoiceOption[] = sortedVoices.flatMap((voice) => {
+                const nativeVoice =
+                    voiceManager.convertToSpeechSynthesisVoice(voice);
+
+                if (!nativeVoice) {
+                    return [];
+                }
+
+                return [
+                    {
+                        id: getVoiceOptionId(nativeVoice, voice.language),
+                        isDefault: false,
+                        label: voice.label || voice.name,
+                        language: voice.language,
+                        nativeVoice,
+                    },
+                ];
+            });
+            const defaultReadiumVoice = await voiceManager.getDefaultVoice(
+                currentLanguage || preferredLanguages,
+                sortedVoices,
+            );
+            const defaultVoiceId = defaultReadiumVoice
+                ? getVoiceOptionId(
+                      {
+                          name: defaultReadiumVoice.name,
+                          lang: defaultReadiumVoice.language,
+                          voiceURI: defaultReadiumVoice.voiceURI || "",
+                      },
+                      defaultReadiumVoice.language,
+                  )
+                : "";
+            const voiceOptionsWithDefault: VoiceOption[] = mappedVoices.map(
+                (voice) => ({
+                    ...voice,
+                    isDefault: voice.id === defaultVoiceId,
+                }),
+            );
+            const suggestedVoice =
+                voiceOptionsWithDefault.find((voice) => voice.isDefault) ??
+                voiceOptionsWithDefault[0];
+
+            if (cancelled) {
+                return;
+            }
+
+            setVoiceOptions(voiceOptionsWithDefault);
+            setBestVoice(suggestedVoice);
+            setPreferences((current) => {
+                const nextLanguage = current.language || currentLanguage;
+                const selectedVoiceStillAvailable = voiceOptionsWithDefault.some(
+                    (voice) => voice.id === current.voice,
+                );
+
+                if (selectedVoiceStillAvailable && nextLanguage === current.language) {
+                    return current;
+                }
+
+                return {
+                    ...current,
+                    language: nextLanguage,
+                    voice: selectedVoiceStillAvailable
+                        ? current.voice
+                        : suggestedVoice?.id || "",
+                };
+            });
+        };
+
+        void syncVoiceOptions();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [preferences.language, voiceManager]);
 
     useEffect(() => {
         localStorage.setItem("preferences", JSON.stringify(preferences));
@@ -152,6 +329,11 @@ export function useSpeechSynthesis() {
 
         const utterance = new SpeechSynthesisUtterance(nextItem.text);
         utterance.rate = preferencesRef.current.speed;
+        utterance.lang =
+            selectedVoiceRef.current?.lang ||
+            preferencesRef.current.language ||
+            navigator.language ||
+            "en-US";
 
         if (selectedVoiceRef.current) {
             utterance.voice = selectedVoiceRef.current;
@@ -254,6 +436,7 @@ export function useSpeechSynthesis() {
         currentlyPlaying,
         historyItems,
         input,
+        languageOptions,
         preferences,
         queuedIds,
         selectedVoice,
@@ -263,6 +446,6 @@ export function useSpeechSynthesis() {
         speechSupported,
         stopPlayback,
         submitInput,
-        voices,
+        voices: voiceOptions,
     };
 }

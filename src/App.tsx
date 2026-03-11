@@ -16,6 +16,7 @@ function App() {
         currentlyPlaying,
         historyItems,
         input,
+        languageOptions,
         preferences,
         queuedIds,
         setInput,
@@ -111,6 +112,7 @@ function App() {
             bestVoice={bestVoice}
             preferences={preferences}
             setPreferences={setPreferences}
+            languageOptions={languageOptions}
             voices={voices}
         />
     );
