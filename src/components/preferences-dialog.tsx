@@ -1,4 +1,12 @@
-import type { Dispatch, ReactElement, SetStateAction } from "react";
+import {
+    cloneElement,
+    useEffect,
+    useState,
+    type Dispatch,
+    type ReactElement,
+    type MouseEvent as ReactMouseEvent,
+    type SetStateAction,
+} from "react";
 import type {
     LanguageOption,
     Preferences,
@@ -9,16 +17,8 @@ import {
     getVoiceLabel,
     SPEED_OPTIONS,
 } from "../hooks/use-speech-synthesis";
+import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
-import {
-    Dialog,
-    DialogClose,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "./ui/dialog";
 import {
     Field,
     FieldContent,
@@ -26,40 +26,60 @@ import {
     FieldGroup,
     FieldLabel,
 } from "./ui/field";
-import {
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "./ui/select";
 
 interface PreferencesDialogProps {
     bestVoice?: VoiceOption;
     children: ReactElement;
     languageOptions: LanguageOption[];
-    onClearHistory: () => void;
     preferences: Preferences;
     setPreferences: Dispatch<SetStateAction<Preferences>>;
     voices: VoiceOption[];
 }
 
+const nativeSelectClassName = cn(
+    "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none",
+    "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+    "disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50",
+    "aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20",
+    "md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
+);
+
 export function PreferencesDialog({
     bestVoice,
     children,
     languageOptions,
-    onClearHistory,
     preferences,
     setPreferences,
     voices,
 }: PreferencesDialogProps) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [draftPreferences, setDraftPreferences] = useState(preferences);
+
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                setIsOpen(false);
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [isOpen]);
+
     const selectedLanguage =
         languageOptions.find(
-            (language) => language.code === preferences.language,
+            (language) => language.code === draftPreferences.language,
         ) ?? languageOptions[0];
     const selectedVoice =
-        voices.find((voice) => voice.id === preferences.voice) ?? bestVoice;
+        voices.find((voice) => voice.id === draftPreferences.voice) ??
+        bestVoice;
     const selectedVoiceLabel = selectedVoice
         ? getVoiceLabel(selectedVoice, { includeFlag: true })
         : undefined;
@@ -68,132 +88,157 @@ export function PreferencesDialog({
         : undefined;
 
     return (
-        <Dialog>
-            <DialogTrigger render={children} />
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Preferences</DialogTitle>
-                </DialogHeader>
+        <>
+            {cloneElement(children, {
+                onClick: (event: ReactMouseEvent) => {
+                    children.props.onClick?.(event);
+                    setDraftPreferences(preferences);
+                    setIsOpen(true);
+                },
+            })}
 
-                <FieldGroup>
-                    <Field>
-                        <FieldLabel htmlFor="speed-preference">
-                            Speed
-                        </FieldLabel>
-                        <FieldContent>
-                            <FieldDescription>
-                                Choose the playback rate for spoken phrases.
-                            </FieldDescription>
-                        </FieldContent>
-                        <Select
-                            value={String(preferences.speed)}
-                            onValueChange={(value) =>
-                                setPreferences((current) => ({
-                                    ...current,
-                                    speed: Number(value),
-                                }))
-                            }
-                        >
-                            <SelectTrigger
-                                className="w-full"
-                                id="speed-preference"
+            {isOpen ? (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 p-4 supports-backdrop-filter:backdrop-blur-xs"
+                    onClick={() => {
+                        setPreferences(draftPreferences);
+                        setIsOpen(false);
+                    }}
+                >
+                    <div
+                        aria-modal="true"
+                        role="dialog"
+                        aria-label="Preferences"
+                        className="grid w-full max-w-sm gap-4 rounded-xl bg-background p-4 text-sm ring-1 ring-foreground/10"
+                        onClick={(event) => {
+                            event.stopPropagation();
+                        }}
+                    >
+                        <div className="flex items-center justify-between gap-3">
+                            <h2 className="text-base leading-none font-medium">
+                                Preferences
+                            </h2>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => {
+                                    setPreferences(draftPreferences);
+                                    setIsOpen(false);
+                                }}
+                                aria-label="Close preferences"
                             >
-                                <SelectValue placeholder="Select speed" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectGroup>
+                                ×
+                            </Button>
+                        </div>
+
+                        <FieldGroup>
+                            <Field>
+                                <FieldLabel htmlFor="speed-preference">
+                                    Speed
+                                </FieldLabel>
+                                <FieldContent>
+                                    <FieldDescription>
+                                        Choose the playback rate for spoken
+                                        phrases.
+                                    </FieldDescription>
+                                </FieldContent>
+                                <select
+                                    className={nativeSelectClassName}
+                                    id="speed-preference"
+                                    value={String(draftPreferences.speed)}
+                                    onChange={(event) =>
+                                        setDraftPreferences((current) => ({
+                                            ...current,
+                                            speed: Number(event.target.value),
+                                        }))
+                                    }
+                                >
                                     {SPEED_OPTIONS.map((option) => (
-                                        <SelectItem
+                                        <option
                                             key={option}
                                             value={String(option)}
                                         >
                                             {option}x
-                                        </SelectItem>
+                                        </option>
                                     ))}
-                                </SelectGroup>
-                            </SelectContent>
-                        </Select>
-                    </Field>
+                                </select>
+                            </Field>
 
-                    <Field>
-                        <FieldLabel htmlFor="language-preference">
-                            Language
-                        </FieldLabel>
-                        <FieldContent>
-                            <FieldDescription>
-                                Select the language you want to write in.
-                            </FieldDescription>
-                        </FieldContent>
-                        <Select
-                            value={preferences.language}
-                            onValueChange={(value) =>
-                                setPreferences((current) => ({
-                                    ...current,
-                                    language: value ?? current.language,
-                                    voice: "",
-                                }))
-                            }
-                        >
-                            <SelectTrigger
-                                className="w-full"
-                                id="language-preference"
-                            >
-                                <SelectValue placeholder="Select language">
-                                    {selectedLanguageLabel}
-                                </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectGroup>
+                            <Field>
+                                <FieldLabel htmlFor="language-preference">
+                                    Language
+                                </FieldLabel>
+                                <FieldContent>
+                                    <FieldDescription>
+                                        Select the language you want to write
+                                        in.
+                                    </FieldDescription>
+                                </FieldContent>
+                                <select
+                                    className={nativeSelectClassName}
+                                    id="language-preference"
+                                    value={draftPreferences.language}
+                                    onChange={(event) =>
+                                        setDraftPreferences((current) => ({
+                                            ...current,
+                                            language: event.target.value,
+                                            voice: "",
+                                        }))
+                                    }
+                                >
+                                    {!draftPreferences.language &&
+                                    selectedLanguageLabel ? (
+                                        <option value="">
+                                            {selectedLanguageLabel}
+                                        </option>
+                                    ) : null}
                                     {languageOptions.map((language) => (
-                                        <SelectItem
+                                        <option
                                             key={language.code}
                                             value={language.code}
                                         >
                                             {getLanguageLabel(language, {
                                                 includeFlag: true,
                                             })}
-                                        </SelectItem>
+                                        </option>
                                     ))}
-                                </SelectGroup>
-                            </SelectContent>
-                        </Select>
-                    </Field>
+                                </select>
+                            </Field>
 
-                    <Field>
-                        <FieldLabel htmlFor="voice-preference">
-                            Voice
-                        </FieldLabel>
-                        <FieldContent>
-                            <FieldDescription>
-                                Pick the voice that sounds the most natural for
-                                you.
-                            </FieldDescription>
-                        </FieldContent>
-                        <Select
-                            value={preferences.voice}
-                            onValueChange={(value) =>
-                                setPreferences((current) => ({
-                                    ...current,
-                                    voice: value ?? current.voice,
-                                }))
-                            }
-                        >
-                            <SelectTrigger
-                                className="w-full"
-                                id="voice-preference"
-                            >
-                                <SelectValue placeholder="Select voice">
-                                    {selectedVoiceLabel}
-                                </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectGroup>
+                            <Field>
+                                <FieldLabel htmlFor="voice-preference">
+                                    Voice
+                                </FieldLabel>
+                                <FieldContent>
+                                    <FieldDescription>
+                                        Pick the voice that sounds the most
+                                        natural for you.
+                                    </FieldDescription>
+                                </FieldContent>
+                                <select
+                                    className={nativeSelectClassName}
+                                    id="voice-preference"
+                                    value={draftPreferences.voice}
+                                    onChange={(event) =>
+                                        setDraftPreferences((current) => ({
+                                            ...current,
+                                            voice: event.target.value,
+                                        }))
+                                    }
+                                >
+                                    {!draftPreferences.voice &&
+                                    selectedVoiceLabel ? (
+                                        <option value="">
+                                            {selectedVoiceLabel}
+                                        </option>
+                                    ) : null}
                                     {bestVoice ? (
-                                        <SelectItem value={bestVoice.id}>
+                                        <option value={bestVoice.id}>
                                             {getVoiceLabel(bestVoice, {
                                                 includeFlag: true,
                                             })}
-                                        </SelectItem>
+                                        </option>
                                     ) : null}
                                     {voices
                                         .filter(
@@ -201,35 +246,34 @@ export function PreferencesDialog({
                                                 voice.id !== bestVoice?.id,
                                         )
                                         .map((voice) => (
-                                            <SelectItem
+                                            <option
                                                 key={voice.id}
                                                 value={voice.id}
                                             >
                                                 {getVoiceLabel(voice, {
                                                     includeFlag: true,
                                                 })}
-                                            </SelectItem>
+                                            </option>
                                         ))}
-                                </SelectGroup>
-                            </SelectContent>
-                        </Select>
-                    </Field>
-                </FieldGroup>
+                                </select>
+                            </Field>
+                        </FieldGroup>
 
-                <DialogFooter>
-                    <DialogClose
-                        render={
+                        <div className="-mx-4 -mb-4 flex justify-end rounded-b-xl border-t bg-muted/50 p-4">
                             <Button
                                 type="button"
-                                variant="destructive"
-                                onClick={onClearHistory}
-                            />
-                        }
-                    >
-                        Clear message history
-                    </DialogClose>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                                className="w-full"
+                                onClick={() => {
+                                    setPreferences(draftPreferences);
+                                    setIsOpen(false);
+                                }}
+                            >
+                                Apply
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+        </>
     );
 }

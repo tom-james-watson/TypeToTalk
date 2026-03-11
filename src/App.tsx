@@ -12,7 +12,6 @@ function App() {
     const mainRef = useRef<HTMLElement>(null);
     const {
         bestVoice,
-        clearHistory,
         currentlyPlaying,
         historyItems,
         input,
@@ -108,7 +107,6 @@ function App() {
             input={input}
             onInputChange={setInput}
             onSubmit={submitInput}
-            onClearHistory={clearHistory}
             bestVoice={bestVoice}
             preferences={preferences}
             setPreferences={setPreferences}

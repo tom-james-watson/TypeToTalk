@@ -18,7 +18,6 @@ interface ComposerBarProps {
     languageOptions: LanguageOption[];
     onInputChange: (value: string) => void;
     onSubmit: () => void;
-    onClearHistory: () => void;
     preferences: Preferences;
     setPreferences: Dispatch<SetStateAction<Preferences>>;
     voices: VoiceOption[];
@@ -31,7 +30,6 @@ export function ComposerBar({
     languageOptions,
     onInputChange,
     onSubmit,
-    onClearHistory,
     preferences,
     setPreferences,
     voices,
@@ -77,7 +75,6 @@ export function ComposerBar({
                             <PreferencesDialog
                                 bestVoice={bestVoice}
                                 languageOptions={languageOptions}
-                                onClearHistory={onClearHistory}
                                 preferences={preferences}
                                 setPreferences={setPreferences}
                                 voices={voices}
