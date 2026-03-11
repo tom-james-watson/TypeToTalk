@@ -65,18 +65,6 @@ function getPreferredLanguages() {
     return languages.map(normalizeLocale);
 }
 
-export function getReadableLanguageName(langCode: string) {
-    try {
-        const languageNames = new Intl.DisplayNames([navigator.language], {
-            type: "language",
-            style: "long",
-        });
-        return languageNames.of(langCode.split("-")[0]) ?? langCode;
-    } catch {
-        return langCode;
-    }
-}
-
 function getRegionCode(locale: string) {
     const [, region] = locale.split("-");
 
@@ -425,26 +413,17 @@ export function useSpeechSynthesis() {
         speak(newItem.text, newItem.id);
     };
 
-    const clearHistory = () => {
-        stopPlayback({ clearQueue: true });
-        setHistoryItems([]);
-    };
-
     return {
         bestVoice,
-        clearHistory,
         currentlyPlaying,
         historyItems,
         input,
         languageOptions,
         preferences,
         queuedIds,
-        selectedVoice,
         setInput,
         setPreferences,
         speak,
-        speechSupported,
-        stopPlayback,
         submitInput,
         voices: voiceOptions,
     };
