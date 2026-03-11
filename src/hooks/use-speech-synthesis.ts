@@ -179,13 +179,13 @@ export function useSpeechSynthesis() {
     }
 
     let cancelled = false;
+    const filters = {
+      excludeNovelty: true,
+      excludeVeryLowQuality: true,
+      removeDuplicates: true,
+    } as const;
 
     const syncVoiceOptions = async () => {
-      const filters = {
-        excludeNovelty: true,
-        excludeVeryLowQuality: true,
-        removeDuplicates: true,
-      } as const;
       const browserLanguages = voiceManager.getLanguages(
         navigator.language,
         filters,
@@ -215,7 +215,6 @@ export function useSpeechSynthesis() {
         )?.code ||
         availableLanguages[0]?.code ||
         "";
-
       const filteredVoices = voiceManager.getVoices({
         ...filters,
         languages: currentLanguage || preferredLanguages,

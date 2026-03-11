@@ -53,7 +53,6 @@ export function PreferencesDialog({
   voices,
 }: PreferencesDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [draftPreferences, setDraftPreferences] = useState(preferences);
 
   useEffect(() => {
     if (!isOpen) {
@@ -74,11 +73,12 @@ export function PreferencesDialog({
   }, [isOpen]);
 
   const selectedLanguage =
-    languageOptions.find(
-      (language) => language.code === draftPreferences.language,
-    ) ?? languageOptions[0];
+    languageOptions.find((language) => language.code === preferences.language) ??
+    languageOptions[0];
+  const visibleBestVoice =
+    voices.find((voice) => voice.isDefault) ?? voices[0] ?? bestVoice;
   const selectedVoice =
-    voices.find((voice) => voice.id === draftPreferences.voice) ?? bestVoice;
+    voices.find((voice) => voice.id === preferences.voice) ?? visibleBestVoice;
   const selectedVoiceLabel = selectedVoice
     ? getVoiceLabel(selectedVoice, { includeFlag: true })
     : undefined;
@@ -91,7 +91,6 @@ export function PreferencesDialog({
       {cloneElement(children, {
         onClick: (event: ReactMouseEvent) => {
           children.props.onClick?.(event);
-          setDraftPreferences(preferences);
           setIsOpen(true);
         },
       })}
@@ -100,7 +99,6 @@ export function PreferencesDialog({
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 p-4 supports-backdrop-filter:backdrop-blur-xs"
           onClick={() => {
-            setPreferences(draftPreferences);
             setIsOpen(false);
           }}
         >
@@ -122,7 +120,6 @@ export function PreferencesDialog({
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => {
-                  setPreferences(draftPreferences);
                   setIsOpen(false);
                 }}
                 aria-label="Close preferences"
@@ -142,9 +139,9 @@ export function PreferencesDialog({
                 <select
                   className={nativeSelectClassName}
                   id="speed-preference"
-                  value={String(draftPreferences.speed)}
+                  value={String(preferences.speed)}
                   onChange={(event) =>
-                    setDraftPreferences((current) => ({
+                    setPreferences((current) => ({
                       ...current,
                       speed: Number(event.target.value),
                     }))
@@ -168,16 +165,16 @@ export function PreferencesDialog({
                 <select
                   className={nativeSelectClassName}
                   id="language-preference"
-                  value={draftPreferences.language}
+                  value={preferences.language}
                   onChange={(event) =>
-                    setDraftPreferences((current) => ({
+                    setPreferences((current) => ({
                       ...current,
                       language: event.target.value,
                       voice: "",
                     }))
                   }
                 >
-                  {!draftPreferences.language && selectedLanguageLabel ? (
+                  {!preferences.language && selectedLanguageLabel ? (
                     <option value="">{selectedLanguageLabel}</option>
                   ) : null}
                   {languageOptions.map((language) => (
@@ -200,26 +197,26 @@ export function PreferencesDialog({
                 <select
                   className={nativeSelectClassName}
                   id="voice-preference"
-                  value={draftPreferences.voice}
+                  value={preferences.voice}
                   onChange={(event) =>
-                    setDraftPreferences((current) => ({
+                    setPreferences((current) => ({
                       ...current,
                       voice: event.target.value,
                     }))
                   }
                 >
-                  {!draftPreferences.voice && selectedVoiceLabel ? (
+                  {!preferences.voice && selectedVoiceLabel ? (
                     <option value="">{selectedVoiceLabel}</option>
                   ) : null}
-                  {bestVoice ? (
-                    <option value={bestVoice.id}>
-                      {getVoiceLabel(bestVoice, {
+                  {visibleBestVoice ? (
+                    <option value={visibleBestVoice.id}>
+                      {getVoiceLabel(visibleBestVoice, {
                         includeFlag: true,
                       })}
                     </option>
                   ) : null}
                   {voices
-                    .filter((voice) => voice.id !== bestVoice?.id)
+                    .filter((voice) => voice.id !== visibleBestVoice?.id)
                     .map((voice) => (
                       <option key={voice.id} value={voice.id}>
                         {getVoiceLabel(voice, {
@@ -236,11 +233,10 @@ export function PreferencesDialog({
                 type="button"
                 className="w-full"
                 onClick={() => {
-                  setPreferences(draftPreferences);
                   setIsOpen(false);
                 }}
               >
-                Apply
+                Close
               </Button>
             </div>
           </div>
