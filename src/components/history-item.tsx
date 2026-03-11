@@ -24,7 +24,7 @@ export function HistoryItem({
             <div className="flex w-9 shrink-0 justify-end pr-1">
                 <Button
                     type="button"
-                    variant={isPlaying || isQueued ? "secondary" : "ghost"}
+                    variant="ghost"
                     size="icon"
                     className="rounded-full"
                     onClick={onToggle}
@@ -35,7 +35,6 @@ export function HistoryItem({
                               ? "Remove phrase from queue"
                               : "Queue phrase"
                     }
-                    aria-pressed={isPlaying || isQueued}
                 >
                     {isPlaying ? (
                         <Square />
