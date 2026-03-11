@@ -3,6 +3,8 @@ import tailwindcss from "@tailwindcss/vite"
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 // https://vite.dev/config/
 export default defineConfig({
   resolve: {
@@ -10,5 +12,5 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), cloudflare()],
 })
