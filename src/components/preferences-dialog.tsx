@@ -7,6 +7,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type SetStateAction,
 } from "react";
+import { createPortal } from "react-dom";
 import type {
   LanguageOption,
   Preferences,
@@ -86,6 +87,151 @@ export function PreferencesDialog({
   const selectedLanguageLabel = selectedLanguage
     ? getLanguageLabel(selectedLanguage, { includeFlag: true })
     : undefined;
+  const dialog = isOpen ? (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 p-4 supports-backdrop-filter:backdrop-blur-xs"
+      onClick={() => {
+        setIsOpen(false);
+      }}
+    >
+      <div
+        aria-modal="true"
+        role="dialog"
+        aria-label="Preferences"
+        className="grid w-full max-w-sm gap-4 rounded-xl bg-background p-4 text-sm ring-1 ring-foreground/10"
+        onClick={(event) => {
+          event.stopPropagation();
+        }}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base leading-none font-medium">Preferences</h2>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => {
+              setIsOpen(false);
+            }}
+            aria-label="Close preferences"
+          >
+            ×
+          </Button>
+        </div>
+
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="speed-preference">Speed</FieldLabel>
+            <FieldContent>
+              <FieldDescription>
+                Choose the playback rate for spoken phrases.
+              </FieldDescription>
+            </FieldContent>
+            <select
+              className={nativeSelectClassName}
+              id="speed-preference"
+              value={String(preferences.speed)}
+              onChange={(event) =>
+                setPreferences((current) => ({
+                  ...current,
+                  speed: Number(event.target.value),
+                }))
+              }
+            >
+              {SPEED_OPTIONS.map((option) => (
+                <option key={option} value={String(option)}>
+                  {option}x
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field>
+            <FieldLabel htmlFor="language-preference">Language</FieldLabel>
+            <FieldContent>
+              <FieldDescription>
+                Select the language you want to write in.
+              </FieldDescription>
+            </FieldContent>
+            <select
+              className={nativeSelectClassName}
+              id="language-preference"
+              value={preferences.language}
+              onChange={(event) =>
+                setPreferences((current) => ({
+                  ...current,
+                  language: event.target.value,
+                  voice: "",
+                }))
+              }
+            >
+              {!preferences.language && selectedLanguageLabel ? (
+                <option value="">{selectedLanguageLabel}</option>
+              ) : null}
+              {languageOptions.map((language) => (
+                <option key={language.code} value={language.code}>
+                  {getLanguageLabel(language, {
+                    includeFlag: true,
+                  })}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field>
+            <FieldLabel htmlFor="voice-preference">Voice</FieldLabel>
+            <FieldContent>
+              <FieldDescription>
+                Pick the voice that sounds the most natural for you.
+              </FieldDescription>
+            </FieldContent>
+            <select
+              className={nativeSelectClassName}
+              id="voice-preference"
+              value={preferences.voice}
+              onChange={(event) =>
+                setPreferences((current) => ({
+                  ...current,
+                  voice: event.target.value,
+                }))
+              }
+            >
+              {!preferences.voice && selectedVoiceLabel ? (
+                <option value="">{selectedVoiceLabel}</option>
+              ) : null}
+              {visibleBestVoice ? (
+                <option value={visibleBestVoice.id}>
+                  {getVoiceLabel(visibleBestVoice, {
+                    includeFlag: true,
+                  })}
+                </option>
+              ) : null}
+              {voices
+                .filter((voice) => voice.id !== visibleBestVoice?.id)
+                .map((voice) => (
+                  <option key={voice.id} value={voice.id}>
+                    {getVoiceLabel(voice, {
+                      includeFlag: true,
+                    })}
+                  </option>
+                ))}
+            </select>
+          </Field>
+        </FieldGroup>
+
+        <div className="-mx-4 -mb-4 flex justify-end rounded-b-xl border-t bg-muted/50 p-4">
+          <Button
+            type="button"
+            className="w-full"
+            onClick={() => {
+              setIsOpen(false);
+            }}
+          >
+            Close
+          </Button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <>
@@ -96,153 +242,9 @@ export function PreferencesDialog({
         },
       })}
 
-      {isOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 p-4 supports-backdrop-filter:backdrop-blur-xs"
-          onClick={() => {
-            setIsOpen(false);
-          }}
-        >
-          <div
-            aria-modal="true"
-            role="dialog"
-            aria-label="Preferences"
-            className="grid w-full max-w-sm gap-4 rounded-xl bg-background p-4 text-sm ring-1 ring-foreground/10"
-            onClick={(event) => {
-              event.stopPropagation();
-            }}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-base leading-none font-medium">
-                Preferences
-              </h2>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => {
-                  setIsOpen(false);
-                }}
-                aria-label="Close preferences"
-              >
-                ×
-              </Button>
-            </div>
-
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="speed-preference">Speed</FieldLabel>
-                <FieldContent>
-                  <FieldDescription>
-                    Choose the playback rate for spoken phrases.
-                  </FieldDescription>
-                </FieldContent>
-                <select
-                  className={nativeSelectClassName}
-                  id="speed-preference"
-                  value={String(preferences.speed)}
-                  onChange={(event) =>
-                    setPreferences((current) => ({
-                      ...current,
-                      speed: Number(event.target.value),
-                    }))
-                  }
-                >
-                  {SPEED_OPTIONS.map((option) => (
-                    <option key={option} value={String(option)}>
-                      {option}x
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field>
-                <FieldLabel htmlFor="language-preference">Language</FieldLabel>
-                <FieldContent>
-                  <FieldDescription>
-                    Select the language you want to write in.
-                  </FieldDescription>
-                </FieldContent>
-                <select
-                  className={nativeSelectClassName}
-                  id="language-preference"
-                  value={preferences.language}
-                  onChange={(event) =>
-                    setPreferences((current) => ({
-                      ...current,
-                      language: event.target.value,
-                      voice: "",
-                    }))
-                  }
-                >
-                  {!preferences.language && selectedLanguageLabel ? (
-                    <option value="">{selectedLanguageLabel}</option>
-                  ) : null}
-                  {languageOptions.map((language) => (
-                    <option key={language.code} value={language.code}>
-                      {getLanguageLabel(language, {
-                        includeFlag: true,
-                      })}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field>
-                <FieldLabel htmlFor="voice-preference">Voice</FieldLabel>
-                <FieldContent>
-                  <FieldDescription>
-                    Pick the voice that sounds the most natural for you.
-                  </FieldDescription>
-                </FieldContent>
-                <select
-                  className={nativeSelectClassName}
-                  id="voice-preference"
-                  value={preferences.voice}
-                  onChange={(event) =>
-                    setPreferences((current) => ({
-                      ...current,
-                      voice: event.target.value,
-                    }))
-                  }
-                >
-                  {!preferences.voice && selectedVoiceLabel ? (
-                    <option value="">{selectedVoiceLabel}</option>
-                  ) : null}
-                  {visibleBestVoice ? (
-                    <option value={visibleBestVoice.id}>
-                      {getVoiceLabel(visibleBestVoice, {
-                        includeFlag: true,
-                      })}
-                    </option>
-                  ) : null}
-                  {voices
-                    .filter((voice) => voice.id !== visibleBestVoice?.id)
-                    .map((voice) => (
-                      <option key={voice.id} value={voice.id}>
-                        {getVoiceLabel(voice, {
-                          includeFlag: true,
-                        })}
-                      </option>
-                    ))}
-                </select>
-              </Field>
-            </FieldGroup>
-
-            <div className="-mx-4 -mb-4 flex justify-end rounded-b-xl border-t bg-muted/50 p-4">
-              <Button
-                type="button"
-                className="w-full"
-                onClick={() => {
-                  setIsOpen(false);
-                }}
-              >
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {dialog && typeof document !== "undefined"
+        ? createPortal(dialog, document.body)
+        : null}
     </>
   );
 }
