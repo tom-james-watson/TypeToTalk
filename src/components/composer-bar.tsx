@@ -75,6 +75,8 @@ export function ComposerBar({
               }}
               placeholder="Type and press Enter to speak"
               autoComplete="off"
+              autoCapitalize="sentences"
+              autoCorrect="on"
               spellCheck={false}
               className="h-12 px-2 text-[15px] md:text-[15px]"
             />
