@@ -7,7 +7,7 @@ import { cn } from "./lib/utils";
 
 function App() {
   const composerDockRef = useRef<HTMLDivElement>(null);
-  const mainRef = useRef<HTMLElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
   const {
     bestVoice,
     currentlyPlaying,
@@ -116,68 +116,79 @@ function App() {
   );
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
-      <main
-        ref={mainRef}
-        className={cn(
-          "mx-auto min-h-0 w-full max-w-xl flex-1 overflow-y-auto px-4 sm:px-6",
-          hasHistory ? "conversation-layout" : "empty-layout",
-        )}
-      >
-        <section
+    <div
+      ref={mainRef}
+      className="h-dvh overflow-y-auto bg-background text-foreground"
+    >
+      <div className="flex min-h-dvh flex-col">
+        <main
           className={cn(
-            "empty-state-shell",
-            !hasHistory && "flex min-h-full items-center justify-center",
-            hasHistory ? "is-hidden" : "is-visible",
+            "flex w-full flex-1",
+            hasHistory ? "conversation-layout" : "empty-layout",
           )}
-          aria-hidden={hasHistory}
         >
-          <div className="mx-auto flex max-w-xl flex-col items-center justify-center gap-4 px-4 text-center">
-            <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-              Type to Talk
-            </h1>
-            <p className="max-w-lg text-muted-foreground [text-wrap-style:balance]">
-              Built for moments when you&apos;ve lost your voice or can&apos;t
-              speak because of a medical condition.
-            </p>
-          </div>
-        </section>
+          <div className="mx-auto flex min-h-full w-full max-w-xl flex-1 flex-col px-4 sm:px-6">
+            <section
+              className={cn(
+                "empty-state-shell",
+                !hasHistory &&
+                  "flex min-h-full flex-1 items-center justify-center",
+                hasHistory ? "is-hidden" : "is-visible",
+              )}
+              aria-hidden={hasHistory}
+            >
+              <div className="mx-auto flex max-w-xl flex-col items-center justify-center gap-4 px-4 text-center">
+                <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+                  Type to Talk
+                </h1>
+                <p className="max-w-lg text-muted-foreground [text-wrap-style:balance]">
+                  Built for moments when you&apos;ve lost your voice or can&apos;t
+                  speak because of a medical condition.
+                </p>
+              </div>
+            </section>
 
-        <section
-          className={cn(
-            "conversation-shell",
-            hasHistory ? "is-visible" : "is-hidden",
-          )}
-          aria-hidden={!hasHistory}
-        >
-          <div className="mx-auto w-full conversation-list-frame">
-            {hasHistory ? (
-              <HistoryList
-                currentId={currentlyPlaying}
-                items={historyItems}
-                queuedIds={queuedIds}
-                onTogglePlayback={(item) => speak(item.text, item.id)}
-              />
-            ) : null}
+            <section
+              className={cn(
+                "conversation-shell",
+                hasHistory ? "is-visible" : "is-hidden",
+              )}
+              aria-hidden={!hasHistory}
+            >
+              <div className="mx-auto w-full conversation-list-frame">
+                {hasHistory ? (
+                  <HistoryList
+                    currentId={currentlyPlaying}
+                    items={historyItems}
+                    queuedIds={queuedIds}
+                    onTogglePlayback={(item) => speak(item.text, item.id)}
+                  />
+                ) : null}
+              </div>
+            </section>
           </div>
-        </section>
-      </main>
+        </main>
 
-      {hasHistory ? (
-        <div className="pointer-events-none sticky top-0 z-30 -mb-14">
-          <div className="mx-auto w-full max-w-xl px-4 sm:px-6">
-            <div className="h-14 bg-linear-to-b from-background from-0% to-transparent" />
+        {hasHistory ? (
+          <div className="pointer-events-none sticky top-0 z-30 -mb-14">
+            <div className="mx-auto w-full max-w-xl px-4 sm:px-6">
+              <div className="h-14 bg-linear-to-b from-background from-0% to-transparent" />
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      <div className="composer-dock relative z-40 shrink-0">
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-34 bg-linear-to-t from-background from-35% via-background via-57% to-transparent composer-dock__gradient" />
-        <div
-          ref={composerDockRef}
-          className="relative mx-auto w-full max-w-xl px-4 pb-4 sm:px-6 sm:pb-6"
-        >
-          {composer()}
+        <div className="composer-dock sticky bottom-0 z-40 mt-auto">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0">
+            <div className="mx-auto h-34 w-full max-w-xl px-4 sm:px-6">
+              <div className="h-full bg-linear-to-t from-background from-35% via-background via-57% to-transparent composer-dock__gradient" />
+            </div>
+          </div>
+          <div
+            ref={composerDockRef}
+            className="relative mx-auto w-full max-w-xl px-4 pb-4 sm:px-6 sm:pb-6"
+          >
+            {composer()}
+          </div>
         </div>
       </div>
     </div>
