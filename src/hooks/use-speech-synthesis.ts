@@ -46,7 +46,7 @@ function readStoredJSON<T>(key: string, fallback: T): T {
 }
 
 function normalizeLocale(locale: string) {
-  return locale.toLowerCase();
+  return locale.replace(/_/g, "-").toLowerCase();
 }
 
 function getBaseLanguage(locale: string) {
@@ -66,7 +66,7 @@ function getPreferredLanguages() {
 }
 
 function getRegionCode(locale: string) {
-  const [, region] = locale.split("-");
+  const [, region] = normalizeLocale(locale).split("-");
 
   return region?.length === 2 ? region.toUpperCase() : null;
 }
@@ -236,16 +236,16 @@ export function useSpeechSynthesis() {
       const mappedVoices: VoiceOption[] = sortedVoices.flatMap((voice) => {
         const nativeVoice = voiceManager.convertToSpeechSynthesisVoice(voice);
 
-        if (!nativeVoice) {
+        if (!nativeVoice || !nativeVoice.lang) {
           return [];
         }
 
         return [
           {
-            id: getVoiceOptionId(nativeVoice, voice.language),
+            id: getVoiceOptionId(nativeVoice, nativeVoice.lang),
             isDefault: false,
             label: voice.label || voice.name,
-            language: voice.language,
+            language: nativeVoice.lang,
             nativeVoice,
           },
         ];
