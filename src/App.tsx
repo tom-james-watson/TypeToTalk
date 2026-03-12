@@ -142,8 +142,8 @@ function App() {
                   Type to Talk
                 </h1>
                 <p className="max-w-lg text-muted-foreground [text-wrap-style:balance]">
-                  Built for moments when you&apos;ve lost your voice or can&apos;t
-                  speak because of a medical condition.
+                  Built for moments when you&apos;ve lost your voice or
+                  can&apos;t speak because of a medical condition.
                 </p>
               </div>
             </section>

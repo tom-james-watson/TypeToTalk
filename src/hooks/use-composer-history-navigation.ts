@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from "react";
+import { useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { HistoryItem } from "./use-speech-synthesis";
 
 interface UseComposerHistoryNavigationOptions {
@@ -24,6 +18,11 @@ export function useComposerHistoryNavigation({
   const [historyNavigationIndex, setHistoryNavigationIndex] = useState<
     number | null
   >(null);
+  const activeHistoryNavigationIndex =
+    historyNavigationIndex !== null &&
+    historyNavigationIndex < historyItems.length
+      ? historyNavigationIndex
+      : null;
 
   const resetHistoryNavigation = () => {
     draftRef.current = "";
@@ -31,7 +30,7 @@ export function useComposerHistoryNavigation({
   };
 
   const handleInputChange = (value: string) => {
-    if (historyNavigationIndex !== null) {
+    if (activeHistoryNavigationIndex !== null) {
       resetHistoryNavigation();
     }
 
@@ -50,15 +49,15 @@ export function useComposerHistoryNavigation({
 
     if (direction === "up") {
       const nextIndex =
-        historyNavigationIndex === null
+        activeHistoryNavigationIndex === null
           ? historyItems.length - 1
-          : Math.max(0, historyNavigationIndex - 1);
+          : Math.max(0, activeHistoryNavigationIndex - 1);
 
-      if (historyNavigationIndex === null) {
+      if (activeHistoryNavigationIndex === null) {
         draftRef.current = input;
       }
 
-      if (nextIndex === historyNavigationIndex) {
+      if (nextIndex === activeHistoryNavigationIndex) {
         return true;
       }
 
@@ -67,34 +66,24 @@ export function useComposerHistoryNavigation({
       return true;
     }
 
-    if (historyNavigationIndex === null) {
+    if (activeHistoryNavigationIndex === null) {
       return false;
     }
 
     const newestIndex = historyItems.length - 1;
 
-    if (historyNavigationIndex >= newestIndex) {
+    if (activeHistoryNavigationIndex >= newestIndex) {
       const restoredDraft = draftRef.current;
       resetHistoryNavigation();
       setInput(restoredDraft);
       return true;
     }
 
-    const nextIndex = historyNavigationIndex + 1;
+    const nextIndex = activeHistoryNavigationIndex + 1;
     setHistoryNavigationIndex(nextIndex);
     setInput(historyItems[nextIndex].text);
     return true;
   };
-
-  useEffect(() => {
-    if (historyNavigationIndex === null) {
-      return;
-    }
-
-    if (historyNavigationIndex >= historyItems.length) {
-      resetHistoryNavigation();
-    }
-  }, [historyItems.length, historyNavigationIndex]);
 
   return {
     handleArrowHistoryNavigate,
