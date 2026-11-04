@@ -10,12 +10,21 @@ function App() {
   const mainRef = useRef<HTMLDivElement>(null);
   const {
     bestVoice,
+    status,
+    isReady,
+    needsDownload,
+    retryPreparation,
+    error,
     currentlyPlaying,
     historyItems,
     input,
     languageOptions,
     preferences,
+    previewing,
+    previewVoice,
+    getPreviewProgress,
     queuedIds,
+    stopPreview,
     setInput,
     setPreferences,
     speak,
@@ -83,7 +92,9 @@ function App() {
       }
 
       const composerInput =
-        composerDockRef.current?.querySelector<HTMLInputElement>("input");
+        composerDockRef.current?.querySelector<HTMLInputElement>(
+          "input:not(:disabled)",
+        );
 
       if (!composerInput) {
         return;
@@ -104,11 +115,20 @@ function App() {
   const composer = () => (
     <ComposerBar
       input={input}
+      preparation={status}
+      isReady={isReady}
+      needsDownload={needsDownload}
+      error={error}
+      onRetry={retryPreparation}
       onArrowHistoryNavigate={handleArrowHistoryNavigate}
       onInputChange={handleInputChange}
       onSubmit={handleSubmit}
       bestVoice={bestVoice}
       preferences={preferences}
+      previewing={previewing}
+      onPreviewVoice={previewVoice}
+      onStopPreview={stopPreview}
+      getPreviewProgress={getPreviewProgress}
       setPreferences={setPreferences}
       languageOptions={languageOptions}
       voices={voices}
