@@ -1,5 +1,6 @@
 import type { Phonon } from "phonon-webgpu";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPlaybackBuffer } from "../lib/playback-buffer";
 
 export interface HistoryItem {
   id: number;
@@ -366,13 +367,10 @@ export function useSpeechSynthesis() {
         (language) => language.code === prefs.language,
       )?.defaultVoice;
 
-      await model.speak(item.text, {
-        voice: availableVoices.some((voice) => voice.id === prefs.voice)
-          ? prefs.voice
-          : (defaultVoice ?? model.defaultVoice),
+      const playback = createPlaybackBuffer({
+        text: item.text,
         speed: prefs.speed,
-        signal: controller.signal,
-        onAudio: (samples) => {
+        play: (samples) => {
           if (controller.signal.aborted) return;
           const buffer = context.createBuffer(1, samples.length, 24000);
           buffer.getChannelData(0).set(samples);
@@ -392,7 +390,18 @@ export function useSpeechSynthesis() {
           nextTime += buffer.duration;
         },
       });
-      if (!controller.signal.aborted) setStatus(null);
+
+      await model.speak(item.text, {
+        voice: availableVoices.some((voice) => voice.id === prefs.voice)
+          ? prefs.voice
+          : (defaultVoice ?? model.defaultVoice),
+        speed: prefs.speed,
+        signal: controller.signal,
+        onAudio: playback.push,
+      });
+      if (controller.signal.aborted) return;
+      playback.end();
+      setStatus(null);
       generated = true;
       if (pending === 0) finish();
     };
@@ -497,13 +506,19 @@ export function useSpeechSynthesis() {
       const phrase = (PREVIEW_PHRASES[language] ?? PREVIEW_PHRASES.en)(
         voice.label,
       );
+      const playback = createPlaybackBuffer({
+        text: phrase,
+        speed,
+        play: schedule,
+      });
       const speech = await model.speak(phrase, {
         voice: voice.id,
         speed,
         signal: controller.signal,
-        onAudio: schedule,
+        onAudio: playback.push,
       });
       if (controller.signal.aborted) return;
+      playback.end();
       previewCacheRef.current.set(key, speech.audio);
       generated = true;
       if (pending === 0) finish();
