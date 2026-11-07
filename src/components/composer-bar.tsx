@@ -45,6 +45,8 @@ function Unavailable({
   onRetry: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<number>(undefined);
+  useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
   const advice = unsupported ? getBrowserAdvice() : null;
 
   return (
@@ -72,7 +74,14 @@ function Unavailable({
           onClick={() => {
             void navigator.clipboard
               ?.writeText(location.href)
-              .then(() => setCopied(true))
+              .then(() => {
+                setCopied(true);
+                window.clearTimeout(copiedTimer.current);
+                copiedTimer.current = window.setTimeout(
+                  () => setCopied(false),
+                  2000,
+                );
+              })
               .catch(() => {});
           }}
         >
