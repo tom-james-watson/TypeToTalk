@@ -13,6 +13,7 @@ function App() {
     status,
     isReady,
     needsDownload,
+    unsupported,
     retryPreparation,
     error,
     currentlyPlaying,
@@ -118,6 +119,7 @@ function App() {
       preparation={status}
       isReady={isReady}
       needsDownload={needsDownload}
+      unsupported={unsupported}
       error={error}
       onRetry={retryPreparation}
       onArrowHistoryNavigate={handleArrowHistoryNavigate}

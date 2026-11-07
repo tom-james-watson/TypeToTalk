@@ -1,4 +1,4 @@
-import { ArrowUp, RotateCw, Settings2 } from "lucide-react";
+import { ArrowUp, Settings2 } from "lucide-react";
 import {
   useEffect,
   useLayoutEffect,
@@ -22,11 +22,73 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "./ui/input-group";
 
 type Phase = "loading" | "error" | "ready";
 
+/**
+ * What to say for a browser without WebGPU. Only where a better browser is a
+ * safe bet, like Firefox on Android, do we suggest opening the page in it.
+ */
+function getBrowserAdvice() {
+  const agent = navigator.userAgent;
+  if (/Android/.test(agent) && !/Chrome\//.test(agent))
+    return {
+      text: "Unsupported browser. Open this page in Chrome.",
+      switchBrowser: true,
+    };
+  return { text: "Unsupported browser.", switchBrowser: false };
+}
+
+/** Takes the input's place when voices can't run, with the one thing to do about it. */
+function Unavailable({
+  unsupported,
+  onRetry,
+}: {
+  unsupported: boolean;
+  onRetry: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const advice = unsupported ? getBrowserAdvice() : null;
+
+  return (
+    <div
+      role="status"
+      className="flex min-h-14 flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center text-[15px] text-balance"
+    >
+      <p className="text-muted-foreground">
+        {advice ? advice.text : "Couldn’t load voices."}
+      </p>
+      {!advice ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="rounded-full"
+          onClick={onRetry}
+        >
+          Try again
+        </Button>
+      ) : advice.switchBrowser ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="rounded-full"
+          onClick={() => {
+            void navigator.clipboard
+              ?.writeText(location.href)
+              .then(() => setCopied(true))
+              .catch(() => {});
+          }}
+        >
+          {copied ? "Link copied" : "Copy link"}
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 interface ComposerBarProps {
   className?: string;
   preparation: { progress: number | null } | null;
   isReady: boolean;
   needsDownload: boolean | null;
+  unsupported: boolean;
   error: string;
   onRetry: () => void;
   bestVoice?: VoiceOption;
@@ -49,6 +111,7 @@ export function ComposerBar({
   preparation,
   isReady,
   needsDownload,
+  unsupported,
   error,
   onRetry,
   className,
@@ -66,9 +129,6 @@ export function ComposerBar({
   voices,
 }: ComposerBarProps) {
   const inputId = useId();
-  // InputGroupInput doesn't forward refs, so reach the input by its id.
-  const focusInput = () =>
-    document.getElementById(inputId)?.focus({ preventScroll: true });
   const phase: Phase = error ? "error" : isReady ? "ready" : "loading";
   const progress = preparation?.progress ?? null;
   // Only a real download gets the loading outline. With the model cached, the
@@ -78,12 +138,20 @@ export function ComposerBar({
   const [revealed, setRevealed] = useState(false);
   if (revealed && phase !== "ready") setRevealed(false);
   const showStatus = phase === "error" || (showLoading && !revealed);
-  const blocked = showStatus || needsDownload === null;
+  const blocked = unsupported || showStatus || needsDownload === null;
 
   useEffect(() => {
     if (!blocked && !document.querySelector('[role="dialog"]'))
       document.getElementById(inputId)?.focus({ preventScroll: true });
   }, [blocked, inputId]);
+
+  if (unsupported || phase === "error") {
+    return (
+      <div className={className}>
+        <Unavailable unsupported={unsupported} onRetry={onRetry} />
+      </div>
+    );
+  }
 
   return (
     <div className={cn("flex w-full items-center", className)}>
@@ -99,7 +167,7 @@ export function ComposerBar({
             Phrase to speak
           </FieldLabel>
           <InputGroup
-            aria-busy={showLoading && !revealed && phase !== "error"}
+            aria-busy={showStatus}
             className="h-14 rounded-full bg-background px-2 has-disabled:bg-background has-disabled:opacity-100 dark:bg-background dark:has-disabled:bg-background"
           >
             {showLoading ? (
@@ -114,15 +182,9 @@ export function ComposerBar({
               {showStatus ? (
                 <p
                   role="status"
-                  title={error || undefined}
-                  className={cn(
-                    "flex h-12 items-center px-2.5 text-[15px]",
-                    phase === "error" && "text-destructive",
-                  )}
+                  className="flex h-12 items-center px-2.5 text-[15px]"
                 >
-                  <span className="truncate">
-                    {phase === "error" ? error : "Loading voice model…"}
-                  </span>
+                  <span className="min-w-0 truncate">Loading voice model…</span>
                 </p>
               ) : (
                 <InputGroupInput
@@ -156,21 +218,6 @@ export function ComposerBar({
               )}
             </div>
             <InputGroupAddon align="inline-end" className="gap-1 pl-1">
-              {phase === "error" ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="rounded-full text-destructive hover:text-destructive"
-                  onClick={() => {
-                    onRetry();
-                    focusInput();
-                  }}
-                >
-                  <RotateCw />
-                  Retry
-                </Button>
-              ) : null}
               <PreferencesDialog
                 preparation={preparation}
                 isReady={isReady}

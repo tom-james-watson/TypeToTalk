@@ -175,6 +175,21 @@ async function hasCachedModel() {
   }
 }
 
+/** Whether this browser can run the model, which needs WebGPU. */
+async function supportsWebGPU() {
+  const gpu = (
+    navigator as Navigator & {
+      gpu?: { requestAdapter: () => Promise<unknown> };
+    }
+  ).gpu;
+  if (!gpu) return false;
+  try {
+    return !!(await gpu.requestAdapter());
+  } catch {
+    return false;
+  }
+}
+
 async function prepareDefaultVoices(model: Phonon, selectedVoice: string) {
   const cache = await caches.open("phonon-webgpu").catch(() => null);
   await Promise.all(
@@ -216,6 +231,7 @@ export function useSpeechSynthesis() {
   });
   const [isReady, setIsReady] = useState(false);
   const [needsDownload, setNeedsDownload] = useState<boolean | null>(null);
+  const [unsupported, setUnsupported] = useState(false);
   const [error, setError] = useState("");
   const voiceOptions = voiceCatalog.filter(
     (voice) =>
@@ -318,18 +334,24 @@ export function useSpeechSynthesis() {
       console.error("Voice preparation failed", reason);
       if (mountedRef.current) {
         setStatus(null);
-        setError(
-          "Couldn’t get your voices ready. Retry or try another browser.",
-        );
+        setError("Couldn’t load voices.");
       }
     });
   }, [loadModel]);
 
   useEffect(() => {
-    void hasCachedModel().then((cached) => {
-      if (mountedRef.current) setNeedsDownload(!cached);
+    void supportsWebGPU().then((supported) => {
+      if (!mountedRef.current) return;
+      if (!supported) {
+        setUnsupported(true);
+        setStatus(null);
+        return;
+      }
+      void hasCachedModel().then((cached) => {
+        if (mountedRef.current) setNeedsDownload(!cached);
+      });
+      retryPreparation();
     });
-    retryPreparation();
   }, [retryPreparation]);
 
   const playNextInQueue = () => {
@@ -592,6 +614,7 @@ export function useSpeechSynthesis() {
     status,
     isReady,
     needsDownload,
+    unsupported,
     retryPreparation,
     error,
     currentlyPlaying,
