@@ -258,6 +258,8 @@ export function ComposerBar({
                 className="rounded-full"
                 disabled={blocked || !input.trim()}
                 aria-label="Speak phrase"
+                // Keep focus, and the phone keyboard, on the input between phrases.
+                onMouseDown={(event) => event.preventDefault()}
               >
                 <ArrowUp />
               </Button>
