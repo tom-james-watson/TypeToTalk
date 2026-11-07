@@ -49,6 +49,21 @@ const LANGUAGES = [
   { code: "pt", label: "Portuguese", defaultVoice: "Davi" },
 ];
 
+/**
+ * The voice a language starts with. English follows the device: a British
+ * voice for English set to a region outside North America, else an American one.
+ */
+function getDefaultVoice(code: string) {
+  if (code === "en") {
+    const locale = navigator.languages?.find((language) =>
+      language.toLowerCase().startsWith("en"),
+    );
+    const region = locale ? getRegionCode(locale) : null;
+    if (region && region !== "US" && region !== "CA") return "Teddy";
+  }
+  return LANGUAGES.find((language) => language.code === code)?.defaultVoice;
+}
+
 export const MAX_HISTORY_ITEMS = 50;
 
 export const SPEED_OPTIONS = [0.8, 0.9, 1, 1.1, 1.2, 1.3];
@@ -143,9 +158,7 @@ function loadVoiceCatalog() {
                 ? voice.language
                 : voice.locale || voice.language,
             isCharacter: voice.locale === "characters",
-            isDefault: LANGUAGES.some(
-              (language) => language.defaultVoice === voice.name,
-            ),
+            isDefault: getDefaultVoice(voice.language) === voice.name,
           };
         });
     })
@@ -202,7 +215,7 @@ async function prepareDefaultVoices(
       .filter(
         (voice) =>
           voice.id === selectedVoice ||
-          LANGUAGES.some((language) => language.defaultVoice === voice.name),
+          getDefaultVoice(voice.language) === voice.name,
       )
       .map(async (voice) => {
         const url = `${VOICE_BASE}/voices/${voice.id}.safetensors`;
@@ -393,9 +406,7 @@ export function useSpeechSynthesis() {
       const availableVoices = model.voices.filter(
         (voice) => voice.language === prefs.language,
       );
-      const defaultVoice = LANGUAGES.find(
-        (language) => language.code === prefs.language,
-      )?.defaultVoice;
+      const defaultVoice = getDefaultVoice(prefs.language);
 
       const voice = availableVoices.some((voice) => voice.id === prefs.voice)
         ? prefs.voice
