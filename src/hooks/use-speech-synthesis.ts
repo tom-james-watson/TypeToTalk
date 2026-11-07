@@ -42,7 +42,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
 };
 
 const LANGUAGES = [
-  { code: "en", label: "English", defaultVoice: "Delia" },
+  { code: "en", label: "English", defaultVoice: "Russell" },
   { code: "es", label: "Spanish", defaultVoice: "Marcos" },
   { code: "fr", label: "French", defaultVoice: "Augustin" },
   { code: "de", label: "German", defaultVoice: "Mats" },
