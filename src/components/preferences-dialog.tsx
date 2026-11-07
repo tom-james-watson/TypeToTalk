@@ -14,6 +14,7 @@ import type {
   LanguageOption,
   Preferences,
   PreviewState,
+  PreviewTiming,
   VoiceOption,
 } from "../hooks/use-speech-synthesis";
 import { getLanguageLabel, SPEED_OPTIONS } from "../hooks/use-speech-synthesis";
@@ -33,7 +34,7 @@ interface PreferencesDialogProps {
   previewing: PreviewState;
   onPreviewVoice: (voice: VoiceOption) => void;
   onStopPreview: () => void;
-  getPreviewProgress: () => number | null;
+  getPreviewTiming: () => PreviewTiming;
   setPreferences: Dispatch<SetStateAction<Preferences>>;
   voices: VoiceOption[];
 }
@@ -50,7 +51,7 @@ export function PreferencesDialog({
   previewing,
   onPreviewVoice,
   onStopPreview,
-  getPreviewProgress,
+  getPreviewTiming,
   setPreferences,
   voices,
 }: PreferencesDialogProps) {
@@ -202,7 +203,7 @@ export function PreferencesDialog({
               voices={voices}
               selectedId={selectedVoice?.id}
               previewing={previewing}
-              getPreviewProgress={getPreviewProgress}
+              getPreviewTiming={getPreviewTiming}
               onChoose={(voice) => {
                 setPreferences((current) => ({ ...current, voice: voice.id }));
                 onPreviewVoice(voice);
@@ -284,13 +285,13 @@ function VoiceList({
   voices,
   selectedId,
   previewing,
-  getPreviewProgress,
+  getPreviewTiming,
   onChoose,
 }: {
   voices: VoiceOption[];
   selectedId?: string;
   previewing: PreviewState;
-  getPreviewProgress: () => number | null;
+  getPreviewTiming: () => PreviewTiming;
   onChoose: (voice: VoiceOption) => void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
@@ -339,7 +340,7 @@ function VoiceList({
                     )}
                   >
                     {preview === "playing" ? (
-                      <PlaybackFill getProgress={getPreviewProgress} />
+                      <PlaybackFill getTiming={getPreviewTiming} />
                     ) : null}
                     <span className="relative">{voice.label}</span>
                   </button>
@@ -355,22 +356,51 @@ function VoiceList({
   );
 }
 
-/** A faint fill that sweeps across a tile in step with its preview's playback. */
-function PlaybackFill({ getProgress }: { getProgress: () => number | null }) {
+/**
+ * A faint fill that sweeps across a tile in step with its preview's playback.
+ * It runs as a compositor animation, so it stays smooth while speech is being
+ * made on the main thread; script only corrects its timing as estimates firm up.
+ */
+function PlaybackFill({ getTiming }: { getTiming: () => PreviewTiming }) {
   const ref = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    let frame = 0;
-    let shown = 0;
-    const tick = () => {
-      // Never step back when more audio streams in and the end moves out.
-      shown = Math.max(shown, getProgress() ?? 0);
-      ref.current?.style.setProperty("transform", `scaleX(${shown})`);
-      frame = requestAnimationFrame(tick);
+    const element = ref.current;
+    if (!element) return;
+    let animation: Animation | null = null;
+    let end = 0;
+
+    const sync = () => {
+      const timing = getTiming();
+      if (!timing) return;
+      const remaining = Math.max(timing.total - timing.elapsed, 0) * 1000;
+      const now = performance.now();
+      // Leave small drift alone: restarting costs more smoothness than it buys.
+      if (animation && Math.abs(now + remaining - end) < 50) return;
+      // Carry on from where the fill is, never back, to land on the real end.
+      const from = animation
+        ? Number(animation.effect?.getComputedTiming().progress ?? 0)
+        : timing.total
+          ? timing.elapsed / timing.total
+          : 0;
+      animation?.cancel();
+      end = now + remaining;
+      animation = element.animate(
+        [
+          { transform: `scaleX(${Math.min(from, 1)})` },
+          { transform: "scaleX(1)" },
+        ],
+        { duration: remaining, easing: "linear", fill: "forwards" },
+      );
     };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [getProgress]);
+
+    sync();
+    const interval = window.setInterval(sync, 100);
+    return () => {
+      window.clearInterval(interval);
+      animation?.cancel();
+    };
+  }, [getTiming]);
 
   return (
     <span

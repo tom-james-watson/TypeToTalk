@@ -1,6 +1,6 @@
-import type { Phonon } from "phonon-webgpu";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPlaybackBuffer } from "../lib/playback-buffer";
+import { loadPhonon, type PhononClient } from "../lib/phonon-client";
 
 export interface HistoryItem {
   id: number;
@@ -32,6 +32,8 @@ export type PreviewState = {
   voiceId: string;
   status: "generating" | "playing";
 } | null;
+
+export type PreviewTiming = { elapsed: number; total: number } | null;
 
 export const DEFAULT_PREFERENCES: Preferences = {
   language: "en",
@@ -190,7 +192,10 @@ async function supportsWebGPU() {
   }
 }
 
-async function prepareDefaultVoices(model: Phonon, selectedVoice: string) {
+async function prepareDefaultVoices(
+  model: PhononClient,
+  selectedVoice: string,
+) {
   const cache = await caches.open("phonon-webgpu").catch(() => null);
   await Promise.all(
     model.voices
@@ -244,7 +249,7 @@ export function useSpeechSynthesis() {
         normalizeLocale(voice.language).split("-")[0] === language.code,
     ).length,
   }));
-  const modelRef = useRef<Promise<Phonon> | null>(null);
+  const modelRef = useRef<Promise<PhononClient> | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
   const sourcesRef = useRef(new Set<AudioBufferSourceNode>());
   const queueRef = useRef<HistoryItem[]>([]);
@@ -259,8 +264,14 @@ export function useSpeechSynthesis() {
     // Audio-clock span of the scheduled audio; the end grows as chunks stream in.
     start?: number;
     end?: number;
+    // The likely length until it is fully made, then the real one.
+    expected?: number;
+    complete?: boolean;
   } | null>(null);
   const previewCacheRef = useRef(new Map<string, Float32Array>());
+  // Spoken phrases by voice, speed and text, so replaying one from history is
+  // instant. Oldest first, trimmed to the history's length.
+  const speechCacheRef = useRef(new Map<string, Float32Array>());
   const preferencesRef = useRef(preferences);
 
   useEffect(() => {
@@ -291,15 +302,12 @@ export function useSpeechSynthesis() {
   const loadModel = useCallback(() => {
     if (!modelRef.current) {
       setStatus({ progress: null });
-      modelRef.current = import("phonon-webgpu")
-        .then(({ Phonon }) =>
-          Phonon.load({
-            model: MODEL,
-            progress: (percent) => {
-              if (mountedRef.current) setStatus({ progress: percent });
-            },
-          }),
-        )
+      modelRef.current = loadPhonon({
+        model: MODEL,
+        progress: (percent) => {
+          if (mountedRef.current) setStatus({ progress: percent });
+        },
+      })
         .then(async (model) => {
           await prepareDefaultVoices(model, preferencesRef.current.voice);
           if (mountedRef.current) {
@@ -389,40 +397,54 @@ export function useSpeechSynthesis() {
         (language) => language.code === prefs.language,
       )?.defaultVoice;
 
-      const playback = createPlaybackBuffer({
-        text: item.text,
-        speed: prefs.speed,
-        play: (samples) => {
-          if (controller.signal.aborted) return;
-          const buffer = context.createBuffer(1, samples.length, 24000);
-          buffer.getChannelData(0).set(samples);
-          const source = context.createBufferSource();
-          source.buffer = buffer;
-          source.connect(context.destination);
-          sourcesRef.current.add(source);
-          pending++;
-          source.onended = () => {
-            source.disconnect();
-            sourcesRef.current.delete(source);
-            pending--;
-            if (generated && pending === 0) finish();
-          };
-          nextTime = Math.max(nextTime, context.currentTime + 0.02);
-          source.start(nextTime);
-          nextTime += buffer.duration;
-        },
-      });
+      const voice = availableVoices.some((voice) => voice.id === prefs.voice)
+        ? prefs.voice
+        : (defaultVoice ?? model.defaultVoice);
+      const play = (samples: Float32Array) => {
+        if (controller.signal.aborted) return;
+        const buffer = context.createBuffer(1, samples.length, 24000);
+        buffer.getChannelData(0).set(samples);
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        source.connect(context.destination);
+        sourcesRef.current.add(source);
+        pending++;
+        source.onended = () => {
+          source.disconnect();
+          sourcesRef.current.delete(source);
+          pending--;
+          if (generated && pending === 0) finish();
+        };
+        nextTime = Math.max(nextTime, context.currentTime + 0.02);
+        source.start(nextTime);
+        nextTime += buffer.duration;
+      };
 
-      await model.speak(item.text, {
-        voice: availableVoices.some((voice) => voice.id === prefs.voice)
-          ? prefs.voice
-          : (defaultVoice ?? model.defaultVoice),
-        speed: prefs.speed,
-        signal: controller.signal,
-        onAudio: playback.push,
-      });
-      if (controller.signal.aborted) return;
-      playback.end();
+      const cache = speechCacheRef.current;
+      const key = `${voice}|${prefs.speed}|${item.text}`;
+      const cached = cache.get(key);
+      if (cached) {
+        cache.delete(key);
+        cache.set(key, cached);
+        play(cached);
+      } else {
+        const playback = createPlaybackBuffer({
+          text: item.text,
+          speed: prefs.speed,
+          play,
+        });
+        const speech = await model.speak(item.text, {
+          voice,
+          speed: prefs.speed,
+          signal: controller.signal,
+          onAudio: playback.push,
+        });
+        if (controller.signal.aborted) return;
+        playback.end();
+        cache.set(key, speech.audio);
+        if (cache.size > MAX_HISTORY_ITEMS)
+          cache.delete(cache.keys().next().value!);
+      }
       setStatus(null);
       generated = true;
       if (pending === 0) finish();
@@ -451,16 +473,20 @@ export function useSpeechSynthesis() {
     setPreviewing(null);
   }, []);
 
-  /** How far the playing preview has got, from 0 to 1, or null when none is playing. */
-  const getPreviewProgress = useCallback(() => {
+  /**
+   * How long the playing preview has played and will play in all, in seconds,
+   * or null when none is playing. Until it is fully made, the total is an
+   * estimate, so the time played isn't measured against only what exists yet.
+   */
+  const getPreviewTiming = useCallback((): PreviewTiming => {
     const preview = previewRef.current;
     const context = audioRef.current;
-    if (!preview?.start || !preview.end || !context) return null;
-    const span = preview.end - preview.start;
-    return Math.min(
-      Math.max((context.currentTime - preview.start) / span, 0),
-      1,
-    );
+    if (preview?.start == null || preview.end == null || !context) return null;
+    const made = preview.end - preview.start;
+    return {
+      elapsed: Math.max(context.currentTime - preview.start, 0),
+      total: preview.complete ? made : Math.max(made, preview.expected ?? 0),
+    };
   }, []);
 
   /** Plays a voice introducing itself, so voices can be compared while choosing. */
@@ -514,6 +540,7 @@ export function useSpeechSynthesis() {
     const cached = previewCacheRef.current.get(key);
     if (cached) {
       generated = true;
+      preview.complete = true;
       schedule(cached);
       return;
     }
@@ -533,6 +560,7 @@ export function useSpeechSynthesis() {
         speed,
         play: schedule,
       });
+      preview.expected = playback.expected;
       const speech = await model.speak(phrase, {
         voice: voice.id,
         speed,
@@ -542,6 +570,7 @@ export function useSpeechSynthesis() {
       if (controller.signal.aborted) return;
       playback.end();
       previewCacheRef.current.set(key, speech.audio);
+      preview.complete = true;
       generated = true;
       if (pending === 0) finish();
     })().catch((reason: unknown) => {
@@ -624,7 +653,7 @@ export function useSpeechSynthesis() {
     preferences,
     previewing,
     previewVoice,
-    getPreviewProgress,
+    getPreviewTiming,
     queuedIds,
     stopPreview,
     setInput,

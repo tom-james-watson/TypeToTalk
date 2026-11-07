@@ -59,6 +59,8 @@ export function createPlaybackBuffer({
   };
 
   return {
+    /** The phrase's likely length in seconds, before it is made. */
+    expected,
     push(samples: Float32Array) {
       made += samples.length / 24000;
       chunks++;

@@ -12,6 +12,7 @@ import type {
   LanguageOption,
   Preferences,
   PreviewState,
+  PreviewTiming,
   VoiceOption,
 } from "../hooks/use-speech-synthesis";
 import { cn } from "../lib/utils";
@@ -110,7 +111,7 @@ interface ComposerBarProps {
   previewing: PreviewState;
   onPreviewVoice: (voice: VoiceOption) => void;
   onStopPreview: () => void;
-  getPreviewProgress: () => number | null;
+  getPreviewTiming: () => PreviewTiming;
   setPreferences: Dispatch<SetStateAction<Preferences>>;
   voices: VoiceOption[];
 }
@@ -133,7 +134,7 @@ export function ComposerBar({
   previewing,
   onPreviewVoice,
   onStopPreview,
-  getPreviewProgress,
+  getPreviewTiming,
   setPreferences,
   voices,
 }: ComposerBarProps) {
@@ -238,7 +239,7 @@ export function ComposerBar({
                 previewing={previewing}
                 onPreviewVoice={onPreviewVoice}
                 onStopPreview={onStopPreview}
-                getPreviewProgress={getPreviewProgress}
+                getPreviewTiming={getPreviewTiming}
                 setPreferences={setPreferences}
                 voices={voices}
               >

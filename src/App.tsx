@@ -23,7 +23,7 @@ function App() {
     preferences,
     previewing,
     previewVoice,
-    getPreviewProgress,
+    getPreviewTiming,
     queuedIds,
     stopPreview,
     setInput,
@@ -130,7 +130,7 @@ function App() {
       previewing={previewing}
       onPreviewVoice={previewVoice}
       onStopPreview={stopPreview}
-      getPreviewProgress={getPreviewProgress}
+      getPreviewTiming={getPreviewTiming}
       setPreferences={setPreferences}
       languageOptions={languageOptions}
       voices={voices}
